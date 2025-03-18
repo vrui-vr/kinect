@@ -1,0 +1,9 @@
+BuildRoot/Configuration.Kinect
+Kinect/Config.h
+Kinect/Internal/Config.h
+d/
+o/
+lib/
+lib64/
+bin/
+Make.sh
