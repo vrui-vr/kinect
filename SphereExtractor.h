@@ -1,7 +1,7 @@
 /***********************************************************************
 SphereExtractor - Helper class to identify and extract spheres of known
 radii in depth images.
-Copyright (c) 2014-2023 Oliver Kreylos
+Copyright (c) 2014-2025 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -51,7 +51,8 @@ class SphereExtractor
 	typedef Kinect::FrameSource::ColorPixel ColorPixel;
 	typedef Kinect::FrameSource::ColorSpace ColorSpace;
 	typedef Kinect::FrameSource::DepthCorrection::PixelCorrection PixelDepthCorrection;
-	typedef Kinect::FrameSource::IntrinsicParameters::PTransform PTransform;
+	typedef Kinect::FrameSource::IntrinsicParameters IntrinsicParameters;
+	typedef IntrinsicParameters::PTransform PTransform;
 	public:
 	typedef PTransform::Scalar Scalar;
 	typedef Geometry::Point<Scalar,2> PixelPos; // Type for lens distortion-corrected depth frame pixel center positions
@@ -64,9 +65,8 @@ class SphereExtractor
 	Size depthFrameSize; // Width and height of source's depth frames
 	PixelPos* depthPixels; // 2D array of (lens distortion-corrected) depth frame pixel center positions
 	const PixelDepthCorrection* dcBuffer; // Pointer to frame source's per-pixel depth correction buffer
-	PTransform depthProjection; // Frame source's depth unprojection matrix
 	Size colorFrameSize; // Width and height of source's color frames
-	PTransform colorProjection; // Frame source's color projection matrix
+	IntrinsicParameters intrinsicParameters; // Frame source's intrinsic parameters
 	ColorSpace colorSpace; // Frame source's color space
 	int maxBlobMergeDist; // Maximum depth distance between adjacent pixels to merge their respective blobs
 	Scalar sphereRadius; // Radius of sphere in 3D camera space's measurement unit

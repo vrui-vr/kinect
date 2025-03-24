@@ -1,7 +1,7 @@
 /***********************************************************************
 SphereExtractor - Helper class to identify and extract spheres of known
 radii in depth images.
-Copyright (c) 2014-2023 Oliver Kreylos
+Copyright (c) 2014-2025 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -26,10 +26,8 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Misc/FunctionCalls.h>
 #include <Math/Math.h>
 #include <Math/Matrix.h>
-#define GEOMETRY_NONSTANDARD_TEMPLATES
 #include <Geometry/LevenbergMarquardtMinimizer.h>
 #include <Images/ExtractBlobs.h>
-#include <Kinect/LensDistortion.h>
 
 namespace {
 
@@ -351,7 +349,7 @@ void* SphereExtractor::frameProcessingThreadMethod(void)
 	blobCreator.depthFrameSize=depthFrameSize;
 	blobCreator.depthPixels=depthPixels;
 	blobCreator.pixelDepthCorrection=dcBuffer;
-	blobCreator.depthProjection=depthProjection;
+	blobCreator.depthProjection=intrinsicParameters.depthProjection;
 	
 	/* Calculate a direct transformation matrix from depth image space to color image space: */
 	blobCreator.colorFrameSize=colorFrameSize;
@@ -359,7 +357,7 @@ void* SphereExtractor::frameProcessingThreadMethod(void)
 	PTransform::Matrix& cdpm=blobCreator.colorDepthProjection.getMatrix();
 	cdpm(0,0)=Scalar(colorFrameSize[0]);
 	cdpm(1,1)=Scalar(colorFrameSize[1]);
-	blobCreator.colorDepthProjection*=colorProjection;
+	blobCreator.colorDepthProjection*=intrinsicParameters.colorProjection;
 	
 	/* Set the frame source's color space: */
 	blobCreator.colorSpace=colorSpace;
@@ -449,10 +447,10 @@ void* SphereExtractor::frameProcessingThreadMethod(void)
 	}
 
 SphereExtractor::SphereExtractor(Kinect::FrameSource& frameSource,const SphereExtractor::PixelDepthCorrection* sDcBuffer)
-	:depthFrameSize(frameSource.getActualFrameSize(Kinect::FrameSource::DEPTH)),
-	 depthPixels(0),dcBuffer(sDcBuffer),depthProjection(frameSource.getIntrinsicParameters().depthProjection),
+	:depthFrameSize(frameSource.getActualFrameSize(Kinect::FrameSource::DEPTH)),depthPixels(0),dcBuffer(sDcBuffer),
 	 colorFrameSize(frameSource.getActualFrameSize(Kinect::FrameSource::COLOR)),
-	 colorProjection(frameSource.getIntrinsicParameters().colorProjection),colorSpace(frameSource.getColorSpace()),
+	 intrinsicParameters(frameSource.getIntrinsicParameters()),
+	 colorSpace(frameSource.getColorSpace()),
 	 sphereRadius(0),
 	 minWhite(192),maxSpread(32),minBlobSize(10),radiusTolerance(0.2),maxResidual(0.1),
 	 inDepthFrameVersion(0),
@@ -462,8 +460,7 @@ SphereExtractor::SphereExtractor(Kinect::FrameSource& frameSource,const SphereEx
 	depthPixels=new PixelPos[depthFrameSize.volume()];
 	
 	/* Check if the depth camera requires lens distortion correction: */
-	const Kinect::LensDistortion& dld=frameSource.getIntrinsicParameters().depthLensDistortion;
-	if(!dld.isIdentity())
+	if(!intrinsicParameters.depthLensDistortion.isIdentity())
 		{
 		/* Create a grid of lens distortion-corrected pixel positions: */
 		PixelPos* dpPtr=depthPixels;
@@ -471,7 +468,7 @@ SphereExtractor::SphereExtractor(Kinect::FrameSource& frameSource,const SphereEx
 			for(unsigned int x=0;x<depthFrameSize[0];++x,++dpPtr)
 				{
 				/* Undistort the grid point in pixel space: */
-				*dpPtr=PixelPos(dld.undistortPixel(x,y));
+				*dpPtr=PixelPos(intrinsicParameters.undistortDepthPixel(x,y));
 				}
 		}
 	else

@@ -1,7 +1,7 @@
 /***********************************************************************
 DiskExtractor - Helper class to extract the 3D center points of disks
 from depth images.
-Copyright (c) 2015-2022 Oliver Kreylos
+Copyright (c) 2015-2025 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -49,6 +49,7 @@ class DiskExtractor
 	private:
 	typedef FrameSource::DepthPixel DepthPixel; // Type for depth image pixels
 	typedef FrameSource::DepthCorrection::PixelCorrection PixelDepthCorrection; // Type for per-pixel depth correction factors
+	typedef FrameSource::IntrinsicParameters::LensDistortion LensDistortion; // Type for lens distortion correction formulas
 	typedef FrameSource::IntrinsicParameters::PTransform PTransform; // Type for projections from depth image space into camera space
 	public:
 	typedef PTransform::Scalar Scalar; // Type for scalar values
@@ -74,9 +75,6 @@ class DiskExtractor
 	typedef Misc::FunctionCall<const Disk&> TrackingCallback; // Type for functions to be called with the blob containing a tracked pixel
 	
 	/* Forward declarations of embedded classes: */
-	#if 0 // Not used anymore
-	struct DepthCentroidBlob;
-	#endif
 	struct DepthPCABlob;
 	
 	/* Elements: */
@@ -103,6 +101,7 @@ class DiskExtractor
 	TrackingCallback* trackingCallback; // Function called with the disk containing a tracked pixel
 	
 	/* Private methods: */
+	void createImagePoints(const FrameSource::IntrinsicParameters& ips); // Creates an array of image pixels with averaging weights
 	void* diskExtractorThreadMethod(void); // Method implementing the disk extractor thread
 	
 	/* Constructors and destructors: */

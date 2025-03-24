@@ -1,7 +1,7 @@
 /***********************************************************************
 BackgroundViewer - Utility to view (and edit) a 3D camera's background
 removal frame.
-Copyright (c) 2018-2024 Oliver Kreylos
+Copyright (c) 2018-2025 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -46,7 +46,6 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Kinect/Internal/Config.h>
 #include <Kinect/FrameBuffer.h>
 #include <Kinect/MeshBuffer.h>
-#include <Kinect/LensDistortion.h>
 #include <Kinect/FrameSource.h>
 #include <Kinect/ProjectorHeader.h>
 
@@ -385,8 +384,8 @@ BackgroundViewer::BackgroundViewer(int& argc,char**& argv)
 			intrinsicParameterFile->read(colorMatrix,4*4);
 			ips.colorProjection=Kinect::FrameSource::IntrinsicParameters::PTransform::fromRowMajor(colorMatrix);
 			
-			/* Set projection parameters for the lens distortion corrector: */
-			ips.depthLensDistortion.setProjection(ips.depthProjection);
+			/* Update the intrinsic transformations: */
+			ips.updateTransforms();
 			
 			/* Set the projector's intrinsic parameters: */
 			projector.setIntrinsicParameters(ips);

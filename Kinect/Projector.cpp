@@ -2,7 +2,7 @@
 Projector - Class to project a depth frame captured from a Kinect camera
 back into calibrated 3D camera space, and texture-map it with a matching
 color frame.
-Copyright (c) 2010-2022 Oliver Kreylos
+Copyright (c) 2010-2025 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -115,40 +115,23 @@ void* Projector::depthFrameProcessingThreadMethod(void)
 	}
 
 Projector::Projector(void)
-	:depthSize(0,0),
-	 depthCorrection(0),
-	 inDepthFrameVersion(0),
+	:inDepthFrameVersion(0),
 	 filterDepthFrames(false),lowpassDepthFrames(false),filteredDepthFrame(0),spatialFilterBuffer(0),
-	 triangleDepthRange(5),
 	 meshVersion(0),streamingCallback(0),colorFrameVersion(0)
 	{
 	}
 
 Projector::Projector(FrameSource& frameSource)
-	:GLObject(false),
-	 depthCorrection(0),
+	:ProjectorBase(frameSource),
+	 GLObject(false),
 	 inDepthFrameVersion(0),
 	 filterDepthFrames(false),lowpassDepthFrames(false),filteredDepthFrame(0),spatialFilterBuffer(0),
-	 triangleDepthRange(5),
 	 meshVersion(0),streamingCallback(0),colorFrameVersion(0)
 	{
-	/* Set the depth frame size: */
-	setDepthFrameSize(frameSource.getActualFrameSize(FrameSource::DEPTH));
+	/* Set the depth frame size again to update the quad case vertex offset table: */
+	setDepthFrameSize(depthSize);
 	
-	/* Query the source's depth correction parameters and calculate the depth correction buffer: */
-	FrameSource::DepthCorrection* dc=frameSource.getDepthCorrectionParameters();
-	setDepthCorrection(dc);
-	delete dc;
-	
-	/* Query the source's intrinsic and extrinsic parameters: */
-	FrameSource::IntrinsicParameters ips=frameSource.getIntrinsicParameters();
-	depthLensDistortion=ips.depthLensDistortion;
-	depthProjection=ips.depthProjection;
-	colorProjection=ips.colorProjection;
-	projectorTransform=frameSource.getExtrinsicParameters();
-	worldDepthProjection=projectorTransform;
-	worldDepthProjection*=depthProjection;
-	
+	/* Register this object with the current OpenGL context: */
 	GLObject::init();
 	}
 
@@ -160,9 +143,6 @@ Projector::~Projector(void)
 	/* Delete the frame filtering buffers: */
 	delete[] filteredDepthFrame;
 	delete[] spatialFilterBuffer;
-	
-	/* Delete the depth correction buffer: */
-	delete[] depthCorrection;
 	}
 
 void Projector::initContext(GLContextData& contextData) const
@@ -185,8 +165,8 @@ void Projector::initContext(GLContextData& contextData) const
 
 void Projector::setDepthFrameSize(const Size& newDepthFrameSize)
 	{
-	/* Copy the depth frame size: */
-	depthSize=newDepthFrameSize;
+	/* Call the base class method: */
+	ProjectorBase::setDepthFrameSize(newDepthFrameSize);
 	
 	/*********************************************************************
 	Initialize the quad case vertex offset table:
@@ -221,82 +201,11 @@ void Projector::setDepthFrameSize(const Size& newDepthFrameSize)
 	quadCaseVertexOffsets[0xf][5]=depthSize[0]+1;
 	}
 
-void Projector::setDepthCorrection(const FrameSource::DepthCorrection* dc)
-	{
-	/* Delete the current per-pixel depth correction buffer: */
-	delete depthCorrection;
-	depthCorrection=0;
-	
-	if(dc!=0)
-		{
-		/* Evaluate the depth correction parameters to create a per-pixel depth correction buffer: */
-		depthCorrection=dc->getPixelCorrection(depthSize);
-		}
-	}
-
-void Projector::setIntrinsicParameters(const FrameSource::IntrinsicParameters& ips)
-	{
-	/* Get the depth camera's lens distortion correction parameters: */
-	depthLensDistortion=ips.depthLensDistortion;
-	
-	/* Set the color and depth projection matrices: */
-	depthProjection=ips.depthProjection;
-	colorProjection=ips.colorProjection;
-	
-	/* Calculate the combined world-space depth projection matrix: */
-	worldDepthProjection=projectorTransform;
-	worldDepthProjection*=depthProjection;
-	}
-
-void Projector::setExtrinsicParameters(const FrameSource::ExtrinsicParameters& eps)
-	{
-	projectorTransform=eps;
-	
-	worldDepthProjection=projectorTransform;
-	worldDepthProjection*=depthProjection;
-	}
-
-Projector::Point Projector::projectPoint(const Projector::Point& p) const
-	{
-	/* Transform the point from world space to depth image space: */
-	Point dip=worldDepthProjection.inverseTransform(p);
-	
-	/* Apply inverse lens distortion correction if necessary: */
-	if(!depthLensDistortion.isIdentity())
-		{
-		/* Calculate the undistorted pixel position in pixel space: */
-		LensDistortion::Point dp=LensDistortion::Point(LensDistortion::Scalar(dip[0]),LensDistortion::Scalar(dip[1]));
-		LensDistortion::Point up=depthLensDistortion.undistortPixel(dp);
-		dip[0]=up[0];
-		dip[1]=up[1];
-		}
-	
-	if(depthCorrection!=0)
-		{
-		/* Apply per-pixel depth correction to the depth-image point: */
-		int dipx=int(Math::floor(dip[0]));
-		int dipy=int(Math::floor(dip[1]));
-		if(dipx>=0&&(unsigned int)dipx<depthSize[0]&&dipy>=0&&(unsigned int)dipy<depthSize[1])
-			{
-			const PixelCorrection* dcPtr=depthCorrection+(dipy*depthSize[0]+dipx);
-			dip[2]=(dip[2]-dcPtr->offset)/dcPtr->scale;
-			}
-		}
-	
-	return dip;
-	}
-
 void Projector::setFilterDepthFrames(bool newFilterDepthFrames,bool newLowpassDepthFrames)
 	{
 	/* Just set the flag; the depth frame processing thread will take care of the rest: */
 	filterDepthFrames=newFilterDepthFrames;
 	lowpassDepthFrames=newLowpassDepthFrames;
-	}
-
-void Projector::setTriangleDepthRange(FrameSource::DepthPixel newTriangleDepthRange)
-	{
-	/* Set the triangle depth range immediately; it won't kill the depth frame processing thread if changed in mid-process: */
-	triangleDepthRange=newTriangleDepthRange;
 	}
 
 void Projector::processDepthFrame(const FrameBuffer& depthFrame,MeshBuffer& meshBuffer) const
@@ -311,14 +220,14 @@ void Projector::processDepthFrame(const FrameBuffer& depthFrame,MeshBuffer& mesh
 		MeshBuffer::Vertex* vPtr=meshBuffer.getVertices();
 		
 		/* Check if the depth camera requires lens distortion correction: */
-		if(!depthLensDistortion.isIdentity())
+		if(!intrinsicParameters.depthLensDistortion.isIdentity())
 			{
 			/* Create a grid of undistorted pixel positions: */
 			for(unsigned int y=0;y<depthSize[1];++y)
 				for(unsigned int x=0;x<depthSize[0];++x,++vPtr)
 					{
 					/* Undistort the grid point in pixel space: */
-					LensDistortion::Point up=depthLensDistortion.undistortPixel(x,y);
+					IntrinsicParameters::Point2 up=intrinsicParameters.undistortDepthPixel(x,y);
 					vPtr->position[0]=GLfloat(up[0]);
 					vPtr->position[1]=GLfloat(up[1]);
 					}
@@ -778,9 +687,10 @@ void Projector::glRenderAction(GLContextData& contextData) const
 	glTexGeni(GL_Q,GL_TEXTURE_GEN_MODE,GL_OBJECT_LINEAR);
 	
 	/* Upload the projective texture matrix: */
-	glTexGendv(GL_S,GL_OBJECT_PLANE,colorProjection.getMatrix().getEntries());
-	glTexGendv(GL_T,GL_OBJECT_PLANE,colorProjection.getMatrix().getEntries()+4);
-	glTexGendv(GL_Q,GL_OBJECT_PLANE,colorProjection.getMatrix().getEntries()+12);
+	const PTransform::Matrix& cpMat=intrinsicParameters.colorProjection.getMatrix();
+	glTexGendv(GL_S,GL_OBJECT_PLANE,cpMat.getEntries());
+	glTexGendv(GL_T,GL_OBJECT_PLANE,cpMat.getEntries()+4);
+	glTexGendv(GL_Q,GL_OBJECT_PLANE,cpMat.getEntries()+12);
 	
 	/* Draw the cached indexed triangle set: */
 	GLVertexArrayParts::enable(MeshBuffer::Vertex::getPartsMask());

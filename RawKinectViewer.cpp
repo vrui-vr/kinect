@@ -162,7 +162,7 @@ RawKinectViewer::CPoint RawKinectViewer::calcDepthImagePoint(const Vrui::Point& 
 	if(!intrinsicParameters.depthLensDistortion.isIdentity())
 		{
 		/* Distort the depth image point: */
-		Kinect::LensDistortion::Point ddip=intrinsicParameters.depthLensDistortion.distortPixel(Kinect::LensDistortion::Point(Kinect::LensDistortion::Scalar(dip[0]),Kinect::LensDistortion::Scalar(dip[1])));
+		IntrinsicParameters::Point2 ddip=intrinsicParameters.distortDepthPixel(IntrinsicParameters::Point2(IntrinsicParameters::Scalar(dip[0]),IntrinsicParameters::Scalar(dip[1])));
 		dip[0]=CPoint::Scalar(ddip[0]);
 		dip[1]=CPoint::Scalar(ddip[1]);
 		}
@@ -208,7 +208,7 @@ RawKinectViewer::CPoint RawKinectViewer::getDepthImagePoint(const RawKinectViewe
 	if(!intrinsicParameters.depthLensDistortion.isIdentity())
 		{
 		/* Undistort the depth image point: */
-		Kinect::LensDistortion::Point udip=intrinsicParameters.depthLensDistortion.undistortPixel(Kinect::LensDistortion::Point(Kinect::LensDistortion::Scalar(dip[0]),Kinect::LensDistortion::Scalar(dip[1])));
+		IntrinsicParameters::Point2 udip=intrinsicParameters.undistortDepthPixel(IntrinsicParameters::Point2(IntrinsicParameters::Scalar(dip[0]),IntrinsicParameters::Scalar(dip[1])));
 		dip[0]=CPoint::Scalar(udip[0]);
 		dip[1]=CPoint::Scalar(udip[1]);
 		}
@@ -228,7 +228,7 @@ RawKinectViewer::CPoint RawKinectViewer::getDepthImagePoint(const Vrui::Point& i
 	if(!intrinsicParameters.depthLensDistortion.isIdentity())
 		{
 		/* Distort the depth image point: */
-		Kinect::LensDistortion::Point ddip=intrinsicParameters.depthLensDistortion.distortPixel(Kinect::LensDistortion::Point(Kinect::LensDistortion::Scalar(dip[0]),Kinect::LensDistortion::Scalar(dip[1])));
+		IntrinsicParameters::Point2 ddip=intrinsicParameters.distortDepthPixel(IntrinsicParameters::Point2(IntrinsicParameters::Scalar(dip[0]),IntrinsicParameters::Scalar(dip[1])));
 		dip[0]=CPoint::Scalar(ddip[0]);
 		dip[1]=CPoint::Scalar(ddip[1]);
 		}
@@ -1216,10 +1216,10 @@ void RawKinectViewer::display(GLContextData& contextData) const
 			for(unsigned int x=0;x<=gridSizeX;++x)
 				{
 				/* Calculate the quad vertex positions in distortion-corrected depth image space: */
-				Kinect::LensDistortion::Point dp0(double(x)*scaleX,double(y-1)*scaleY);
-				Kinect::LensDistortion::Point up0=intrinsicParameters.depthLensDistortion.undistortPixel(dp0);
-				Kinect::LensDistortion::Point dp1(double(x)*scaleX,double(y)*scaleY);
-				Kinect::LensDistortion::Point up1=intrinsicParameters.depthLensDistortion.undistortPixel(dp1);
+				IntrinsicParameters::Point2 dp0(IntrinsicParameters::Scalar(double(x)*scaleX),IntrinsicParameters::Scalar(double(y-1)*scaleY));
+				IntrinsicParameters::Point2 up0=intrinsicParameters.undistortDepthPixel(dp0);
+				IntrinsicParameters::Point2 dp1(IntrinsicParameters::Scalar(double(x)*scaleX),IntrinsicParameters::Scalar(double(y)*scaleY));
+				IntrinsicParameters::Point2 up1=intrinsicParameters.undistortDepthPixel(dp1);
 				
 				/* Draw the next quad: */
 				glTexCoord2f(GLfloat(x)*texScaleX,GLfloat(y)*texScaleY);
@@ -1270,17 +1270,49 @@ void RawKinectViewer::display(GLContextData& contextData) const
 		dataItem->colorFrameVersion=colorFrameVersion;
 		}
 	
-	/* Draw the color image: */
-	glBegin(GL_QUADS);
-	glTexCoord2f(0.0f,0.0f);
-	glVertex2d(0.0,0.0);
-	glTexCoord2f(GLfloat(colorFrameSize[0])/GLfloat(dataItem->colorTextureSize[0]),0.0f);
-	glVertex2d(double(colorFrameSize[0])*colorImageScale,0.0);
-	glTexCoord2f(GLfloat(colorFrameSize[0])/GLfloat(dataItem->colorTextureSize[0]),GLfloat(colorFrameSize[1])/GLfloat(dataItem->colorTextureSize[1]));
-	glVertex2d(double(colorFrameSize[0])*colorImageScale,double(colorFrameSize[1])*colorImageScale);
-	glTexCoord2f(0.0f,GLfloat(colorFrameSize[1])/GLfloat(dataItem->colorTextureSize[1]));
-	glVertex2d(0.0,double(colorFrameSize[1])*colorImageScale);
-	glEnd();
+	if(!intrinsicParameters.depthLensDistortion.isIdentity())
+		{
+		/* Create a grid of undistorted pixel positions: */
+		unsigned int gridSizeX=(colorFrameSize[0]+15U)/16U;
+		unsigned int gridSizeY=(colorFrameSize[1]+15U)/16U;
+		double scaleX=double(colorFrameSize[0])/double(gridSizeX);
+		double scaleY=double(colorFrameSize[1])/double(gridSizeY);
+		GLfloat texScaleX=GLfloat(colorFrameSize[0])/GLfloat(gridSizeX*dataItem->colorTextureSize[0]);
+		GLfloat texScaleY=GLfloat(colorFrameSize[1])/GLfloat(gridSizeY*dataItem->colorTextureSize[1]);
+		for(unsigned int y=1;y<=gridSizeY;++y)
+			{
+			glBegin(GL_QUAD_STRIP);
+			for(unsigned int x=0;x<=gridSizeX;++x)
+				{
+				/* Calculate the quad vertex positions in distortion-corrected color image space: */
+				IntrinsicParameters::Point2 dp0(IntrinsicParameters::Scalar(double(x)*scaleX),IntrinsicParameters::Scalar(double(y-1)*scaleY));
+				IntrinsicParameters::Point2 up0=intrinsicParameters.undistortColorPixel(dp0);
+				IntrinsicParameters::Point2 dp1(IntrinsicParameters::Scalar(double(x)*scaleX),IntrinsicParameters::Scalar(double(y)*scaleY));
+				IntrinsicParameters::Point2 up1=intrinsicParameters.undistortColorPixel(dp1);
+				
+				/* Draw the next quad: */
+				glTexCoord2f(GLfloat(x)*texScaleX,GLfloat(y)*texScaleY);
+				glVertex2d(up1[0],up1[1]);
+				glTexCoord2f(GLfloat(x)*texScaleX,GLfloat(y-1)*texScaleY);
+				glVertex2d(up0[0],up0[1]);
+				}
+			glEnd();
+			}
+		}
+	else
+		{
+		/* Draw an undistorted color image: */
+		glBegin(GL_QUADS);
+		glTexCoord2f(0.0f,0.0f);
+		glVertex2d(0.0,0.0);
+		glTexCoord2f(GLfloat(colorFrameSize[0])/GLfloat(dataItem->colorTextureSize[0]),0.0f);
+		glVertex2d(double(colorFrameSize[0])*colorImageScale,0.0);
+		glTexCoord2f(GLfloat(colorFrameSize[0])/GLfloat(dataItem->colorTextureSize[0]),GLfloat(colorFrameSize[1])/GLfloat(dataItem->colorTextureSize[1]));
+		glVertex2d(double(colorFrameSize[0])*colorImageScale,double(colorFrameSize[1])*colorImageScale);
+		glTexCoord2f(0.0f,GLfloat(colorFrameSize[1])/GLfloat(dataItem->colorTextureSize[1]));
+		glVertex2d(0.0,double(colorFrameSize[1])*colorImageScale);
+		glEnd();
+		}
 	
 	/* Protect the texture objects: */
 	glBindTexture(GL_TEXTURE_2D,0);

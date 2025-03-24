@@ -1,6 +1,6 @@
 /***********************************************************************
 CameraV2 - Class representing a Kinect v2 camera.
-Copyright (c) 2015-2024 Oliver Kreylos
+Copyright (c) 2015-2025 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -280,8 +280,8 @@ FrameSource::IntrinsicParameters CameraV2::getIntrinsicParameters(void)
 		result.colorProjection=IntrinsicParameters::PTransform::identity;
 		}
 	
-	/* Set projection parameters for the lens distortion corrector: */
-	result.depthLensDistortion.setProjection(result.depthProjection);
+	/* Update the intrinsic transformations: */
+	result.updateTransforms();
 	
 	return result;
 	}

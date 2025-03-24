@@ -1,7 +1,7 @@
 /***********************************************************************
 FrameSource - Base class for objects that create streams of depth and
 color frames.
-Copyright (c) 2011-2022 Oliver Kreylos
+Copyright (c) 2011-2025 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -28,9 +28,9 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Realtime/Time.h>
 #include <Math/Interval.h>
 #include <Geometry/ProjectiveTransformation.h>
+#include <Video/LensDistortion.h>
 #include <Kinect/Config.h>
 #include <Kinect/Types.h>
-#include <Kinect/LensDistortion.h>
 
 /* Forward declarations: */
 namespace Misc {
@@ -143,12 +143,20 @@ class FrameSource
 		{
 		/* Embedded classes: */
 		public:
+		typedef Video::LensDistortion LensDistortion; // Type for non-linear radial and tangential lens distortion correction formulas
+		typedef LensDistortion::Point Point2; // Type for 2D points in tangent or image space
 		typedef Geometry::ProjectiveTransformation<double,3> PTransform; // Type for projective transformations
 		
 		/* Elements: */
 		LensDistortion depthLensDistortion; // Lens distortion correction parameters for the depth camera
 		PTransform depthProjection; // The projection transformation from depth image space into 3D camera space
+		LensDistortion colorLensDistortion; // Lens distortion correction parameters for the color camera
 		PTransform colorProjection; // The projection transformation from 3D camera space into color image space
+		
+		/* Methods: */
+		static LensDistortion readLensDistortion(IO::File& file,bool newFormat); // Reads lens distortion correction parameters in old (Kinect V2) or new format from a file stream
+		static void writeLensDistortion(const LensDistortion& ld,IO::File& file); // Writes lens distortion correction parameters in new format to a file stream
+		Point2 undistortDepthPixel(const Point2& distortedPixel) const; // Calculates inverse lens distortion correction formula for the given point in depth image space
 		};
 	
 	#if KINECT_CONFIG_FRAMESOURCE_EXTRINSIC_PROJECTIVE
@@ -176,8 +184,8 @@ class FrameSource
 		}
 	virtual void setTimeBase(const Time& newTimeBase); // Sets the frame source's timestamp base point
 	virtual DepthCorrection* getDepthCorrectionParameters(void); // Returns the camera depth correction object, i.e., per-pixel depth value offsets
-	virtual IntrinsicParameters getIntrinsicParameters(void) =0; // Returns the intrinsic camera parameters, i.e., the virtual camera's projection matrix in camera space
-	virtual ExtrinsicParameters getExtrinsicParameters(void) =0; // Returns the extrinsic camera parameters, i.e., the position and orientation of the virtual camera in 3D world space
+	virtual IntrinsicParameters getIntrinsicParameters(void) =0; // Returns the intrinsic camera parameters, i.e., the virtual cameras' lens distortion correction formulas and projection matrices in camera space
+	virtual ExtrinsicParameters getExtrinsicParameters(void) =0; // Returns the extrinsic camera parameters, i.e., the virtual cameras' position and orientation in 3D world space
 	virtual const Size& getActualFrameSize(int sensor) const =0; // Returns the selected frame size of the color or depth stream as an array of (width, height) in pixels
 	virtual DepthRange getDepthRange(void) const; // Returns the range of valid depth pixel values delivered by this frame source
 	virtual void startStreaming(StreamingCallback* newColorStreamingCallback,StreamingCallback* newDepthStreamingCallback) =0; // Installs the given streaming callback and starts receiving color and depth frames

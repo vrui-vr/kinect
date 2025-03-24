@@ -1,7 +1,7 @@
 /***********************************************************************
 FrameSource - Base class for objects that create streams of depth and
 color frames.
-Copyright (c) 2011-2022 Oliver Kreylos
+Copyright (c) 2011-2025 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -222,6 +222,69 @@ FrameSource::DepthCorrection::PixelCorrection* FrameSource::DepthCorrection::get
 		}
 	
 	return result;
+	}
+
+/*************************************************
+Methods of class FrameSource::IntrinsicParameters:
+*************************************************/
+
+FrameSource::IntrinsicParameters::LensDistortion FrameSource::IntrinsicParameters::readLensDistortion(IO::File& file,bool newFormat)
+	{
+	/* Read into a parameter vector to avoid partial initializations: */
+	IntrinsicParameters::LensDistortion::ParameterVector pv;
+	
+	/* Read the distortion center point: */
+	for(int i=0;i<2;++i)
+		pv[i]=IntrinsicParameters::LensDistortion::Scalar(file.read<Misc::Float64>());
+	
+	/* Read the first three radial distortion coefficients: */
+	for(int i=0;i<3;++i)
+		pv[2+i]=IntrinsicParameters::LensDistortion::Scalar(file.read<Misc::Float64>());
+	
+	if(newFormat)
+		{
+		/* Read the remaining three radial distortion coefficients: */
+		for(int i=3;i<6;++i)
+			pv[2+i]=IntrinsicParameters::LensDistortion::Scalar(file.read<Misc::Float64>());
+		}
+	else
+		{
+		/* Reset the remaining three radial distortion coefficients: */
+		for(int i=3;i<6;++i)
+			pv[2+i]=IntrinsicParameters::LensDistortion::Scalar(0);
+		}
+	
+	/* Read the tangential distortion coefficients: */
+	for(int i=0;i<2;++i)
+		pv[2+6+i]=IntrinsicParameters::LensDistortion::Scalar(file.read<Misc::Float64>());
+	
+	IntrinsicParameters::LensDistortion result;
+	result.setParameterVector(pv);
+	return result;
+	}
+
+void FrameSource::IntrinsicParameters::writeLensDistortion(const FrameSource::IntrinsicParameters::LensDistortion& ld,IO::File& file)
+	{
+	/* Retrieve the distortion correction formula's parameter vector: */
+	IntrinsicParameters::LensDistortion::ParameterVector pv=ld.getParameterVector();
+	
+	/* Write all parameters to the file: */
+	for(int i=0;i<2+6+2;++i)
+		file.write(Misc::Float64(pv[i]));
+	}
+
+FrameSource::IntrinsicParameters::Point2 FrameSource::IntrinsicParameters::undistortDepthPixel(const FrameSource::IntrinsicParameters::Point2& distortedPixel) const
+	{
+	/* Transform the depth-image point to depth tangent space: */
+	LensDistortion::Point dtp;
+	dtp[1]=(distortedPixel[1]-cy)/fy;
+	dtp[0]=(distortedPixel[0]-sk*dtp[1]-cx)/fx;
+	
+	/* Calculate the undistorted point in depth tangent space: */
+	LensDistortion::Point utp=depthLensDistortion.undistort(dtp);
+	
+	/* Return the undistorted point transformed back to depth-image space: */
+	return LensDistortion::Point(utp[0]*fx+utp[1]*sk+cx,utp[1]*fy+cy);
 	}
 
 /****************************

@@ -1,7 +1,7 @@
 /***********************************************************************
 KinectViewer - Vislet to draw 3D reconstructions captured from a Kinect
 device in 3D space.
-Copyright (c) 2010-2024 Oliver Kreylos
+Copyright (c) 2010-2025 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -133,7 +133,7 @@ KinectViewer::Renderer::~Renderer(void)
 
 void KinectViewer::Renderer::applyPreTransform(const Kinect::FrameSource::ExtrinsicParameters& preTransform)
 	{
-	Kinect::FrameSource::ExtrinsicParameters ext=projector->getProjectorTransform();
+	Kinect::FrameSource::ExtrinsicParameters ext=projector->getExtrinsicParameters();
 	ext.leftMultiply(preTransform);
 	projector->setExtrinsicParameters(ext);
 	}
@@ -458,7 +458,7 @@ KinectViewer::SynchedRenderer::SynchedRenderer(const std::string& fileName,doubl
 	/* Read the files' format version numbers: */
 	unsigned int colorFormatVersion=colorFile->read<Misc::UInt32>();
 	unsigned int depthFormatVersion=depthFile->read<Misc::UInt32>();
-	if(colorFormatVersion>1||depthFormatVersion>5)
+	if(colorFormatVersion>2||depthFormatVersion>6)
 		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Unsupported 3D video file format");
 	
 	/* Check if there are per-pixel depth correction coefficients: */
@@ -493,19 +493,20 @@ KinectViewer::SynchedRenderer::SynchedRenderer(const std::string& fileName,doubl
 	/* Read the color and depth projections from their respective files: */
 	Kinect::FrameSource::IntrinsicParameters ips;
 	
-	/* Check if the depth camera has lens distortion correction parameters: */
+	/* Read the color camera's lens distortion correction parameters if they are present: */
+	if(colorFormatVersion>=2)
+		ips.colorLensDistortion=ips.readLensDistortion(*colorFile,true);
+	
+	/* Read the depth camera's lens distortion correction parameters if they are present: */
 	if(depthFormatVersion>=5)
-		{
-		/* Read the depth camera's lens distortion correction parameters: */
-		ips.depthLensDistortion.read(*depthFile);
-		}
+		ips.depthLensDistortion=ips.readLensDistortion(*depthFile,depthFormatVersion>=6);
 	
 	/* Read the intrinsic projection matrices: */
 	ips.colorProjection=Misc::Marshaller<Kinect::FrameSource::IntrinsicParameters::PTransform>::read(*colorFile);
 	ips.depthProjection=Misc::Marshaller<Kinect::FrameSource::IntrinsicParameters::PTransform>::read(*depthFile);
 	
-	/* Set projection parameters in the lens distortion corrector: */
-	ips.depthLensDistortion.setProjection(ips.depthProjection);
+	/* Update the intrinsic parameter transformations: */
+	ips.updateTransforms();
 	
 	/* Read the camera transformation from the depth file: */
 	Kinect::FrameSource::ExtrinsicParameters eps;

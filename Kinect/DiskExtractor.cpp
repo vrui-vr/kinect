@@ -1,7 +1,7 @@
 /***********************************************************************
 DiskExtractor - Helper class to extract the 3D center points of disks
 from depth images.
-Copyright (c) 2015-2022 Oliver Kreylos
+Copyright (c) 2015-2025 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -41,89 +41,6 @@ namespace Kinect {
 /********************************
 Declarations of embedded classes:
 ********************************/
-
-#if 0 // Not used anymore
-
-struct DiskExtractor::DepthCentroidBlob:public Images::Blob<DiskExtractor::DepthPixel> // Structure to calculate 3D centroids of blobs in depth image space
-	{
-	/* Embedded classes: */
-	public:
-	typedef DepthPixel Pixel;
-	typedef Images::Blob<DepthPixel> Base;
-	
-	struct Creator:public Base::Creator
-		{
-		/* Elements: */
-		public:
-		Size frameSize; // Size of depth images
-		const PixelDepthCorrection* depthCorrection; // 2D array of per-pixel depth correction factors
-		const ImagePoint* framePixels; // 2D array of lens distortion-corrected depth image pixels
-		PTransform depthProjection; // Projection from depth image space into camera space
-		};
-	
-	/* Elements: */
-	PTransform::HVector c; // Accumulated centroid components (x, y, z) and total weight in depth image space
-	
-	/* Constructors and destructors: */
-	DepthCentroidBlob(unsigned int x,unsigned int y,const Pixel& pixel,const Creator& creator)
-		:Base(x,y,pixel,creator)
-		{
-		/* Calculate the pixel's linear index: */
-		unsigned int index=y*creator.frameSize[0]+x;
-		
-		/* Calculate the pixel's depth image position: */
-		PTransform::Point p(creator.framePixels[index][0],creator.framePixels[index][1],Scalar(pixel));
-		if(creator.depthCorrection!=0)
-			p[2]=Scalar(creator.depthCorrection[index].correct(float(pixel)));
-		
-		/* Unproject the pixel to calculate its centroid accumulation weight as undistortion function scale times camera-space z coordinate to the fourth: */
-		const PTransform::Matrix& m=creator.depthProjection.getMatrix();
-		Scalar weight=creator.framePixels[index].value*Math::sqr(Math::sqr((m(2,0)*p[0]+m(2,1)*p[1]+m(2,2)*p[2]+m(2,3))/(m(3,0)*p[0]+m(3,1)*p[1]+m(3,2)*p[2]+m(3,3))));
-		
-		/* Accumulate the pixel: */
-		c[0]=p[0]*weight;
-		c[1]=p[1]*weight;
-		c[2]=p[2]*weight;
-		c[3]=weight;
-		}
-	
-	/* Methods: */
-	void addPixel(unsigned int x,unsigned int y,const Pixel& pixel,const Creator& creator)
-		{
-		Base::addPixel(x,y,pixel,creator);
-		
-		/* Calculate the pixel's linear index: */
-		unsigned int index=y*creator.frameSize[0]+x;
-		
-		/* Calculate the pixel's depth image position: */
-		PTransform::Point p(creator.framePixels[index][0],creator.framePixels[index][1],Scalar(pixel));
-		if(creator.depthCorrection!=0)
-			p[2]=Scalar(creator.depthCorrection[index].correct(float(pixel)));
-		
-		/* Unproject the pixel to calculate its centroid accumulation weight as undistortion function scale times camera-space z coordinate to the fourth: */
-		const PTransform::Matrix& m=creator.depthProjection.getMatrix();
-		Scalar weight=creator.framePixels[index].value*Math::sqr(Math::sqr((m(2,0)*p[0]+m(2,1)*p[1]+m(2,2)*p[2]+m(2,3))/(m(3,0)*p[0]+m(3,1)*p[1]+m(3,2)*p[2]+m(3,3))));
-		
-		/* Accumulate the pixel: */
-		c[0]+=p[0]*weight;
-		c[1]+=p[1]*weight;
-		c[2]+=p[2]*weight;
-		c[3]+=weight;
-		}
-	void merge(const DepthCentroidBlob& other,const Creator& creator)
-		{
-		Base::merge(other,creator);
-		
-		for(int i=0;i<4;++i)
-			c[i]+=other.c[i];
-		}
-	PTransform::Point getCentroid(const PTransform& depthProjection) const // Returns the blob's centroid in camera space
-		{
-		return depthProjection.transform(c).toPoint();
-		}
-	};
-
-#endif
 
 struct DiskExtractor::DepthPCABlob:public Images::Blob<DiskExtractor::DepthPixel> // Structure to calculate 3D plane equations of blobs in depth image space
 	{
@@ -435,6 +352,44 @@ class BlobMergeChecker // Functor class to check whether two pixels can belong t
 Methods of class DiskExtractor:
 ******************************/
 
+void DiskExtractor::createImagePoints(const FrameSource::IntrinsicParameters& ips)
+	{
+	/* Allocate the image pixel array: */
+	framePixels=new ImagePoint[frameSize.volume()];
+	
+	/* Check whether the depth camera has lens distortion correction parameters: */
+	if(ips.depthLensDistortion.isIdentity())
+		{
+		/* Create uncorrected pixel positions: */
+		ImagePoint* fpPtr=framePixels;
+		for(unsigned int y=0;y<frameSize[1];++y)
+			for(unsigned int x=0;x<frameSize[0];++x,++fpPtr)
+				{
+				(*fpPtr)[0]=Scalar(x)+Scalar(0.5);
+				(*fpPtr)[1]=Scalar(y)+Scalar(0.5);
+				fpPtr->value=LensDistortion::Scalar(1);
+				}
+		}
+	else
+		{
+		/* Create lens distortion-corrected pixel positions: */
+		ImagePoint* fpPtr=framePixels;
+		for(unsigned int y=0;y<frameSize[1];++y)
+			for(unsigned int x=0;x<frameSize[0];++x,++fpPtr)
+				{
+				/* Undistort the image point: */
+				LensDistortion::Point up=ips.undistortDepthPixel(x,y);
+				
+				/* Store the undistorted point: */
+				(*fpPtr)[0]=Scalar(up[0]);
+				(*fpPtr)[1]=Scalar(up[1]);
+				
+				/* Calculate the inverse distortion scale at the undistorted position: */
+				fpPtr->value=LensDistortion::Scalar(1)/ips.depthDistortScalePixel(up);
+				}
+		}
+	}
+
 void* DiskExtractor::diskExtractorThreadMethod(void)
 	{
 	while(true)
@@ -593,39 +548,8 @@ DiskExtractor::DiskExtractor(const Size& sFrameSize,const FrameSource::DepthCorr
 		depthCorrection=dc->getPixelCorrection(frameSize);
 		}
 	
-	/* Pre-compute a 2D array of lens distortion-corrected image pixel positions: */
-	framePixels=new ImagePoint[frameSize.volume()];
-	if(ips.depthLensDistortion.isIdentity())
-		{
-		/* Create uncorrected pixel positions: */
-		ImagePoint* fpPtr=framePixels;
-		for(unsigned int y=0;y<frameSize[1];++y)
-			for(unsigned int x=0;x<frameSize[0];++x,++fpPtr)
-				{
-				(*fpPtr)[0]=Scalar(x)+Scalar(0.5);
-				(*fpPtr)[1]=Scalar(y)+Scalar(0.5);
-				fpPtr->value=LensDistortion::Scalar(1);
-				}
-		}
-	else
-		{
-		/* Create lens distortion-corrected pixel positions: */
-		ImagePoint* fpPtr=framePixels;
-		for(unsigned int y=0;y<frameSize[1];++y)
-			for(unsigned int x=0;x<frameSize[0];++x,++fpPtr)
-				{
-				/* Undistort the image point: */
-				LensDistortion::Point dp(LensDistortion::Scalar(x)+LensDistortion::Scalar(0.5),LensDistortion::Scalar(y)+LensDistortion::Scalar(0.5));
-				LensDistortion::Point up=ips.depthLensDistortion.undistortPixel(dp);
-				
-				/* Store the undistorted point: */
-				(*fpPtr)[0]=Scalar(up[0]);
-				(*fpPtr)[1]=Scalar(up[1]);
-				
-				/* Calculate the inverse distortion scale at the undistorted position: */
-				fpPtr->value=LensDistortion::Scalar(1)/ips.depthLensDistortion.distortScalePixel(up);
-				}
-		}
+	/* Pre-compute a 2D array of image pixel positions with averaging weights: */
+	createImagePoints(ips);
 	
 	/* Copy the depth projection matrix: */
 	depthProjection=ips.depthProjection;
@@ -641,39 +565,8 @@ DiskExtractor::DiskExtractor(const Size& sFrameSize,const DiskExtractor::PixelDe
 	 extractionResultCallback(0),
 	 trackingPixel(~0x0U),trackingCallback(0)
 	{
-	/* Pre-compute a 2D array of lens distortion-corrected image pixel positions: */
-	framePixels=new ImagePoint[frameSize.volume()];
-	if(ips.depthLensDistortion.isIdentity())
-		{
-		/* Create uncorrected pixel positions: */
-		ImagePoint* fpPtr=framePixels;
-		for(unsigned int y=0;y<frameSize[1];++y)
-			for(unsigned int x=0;x<frameSize[0];++x,++fpPtr)
-				{
-				(*fpPtr)[0]=Scalar(x)+Scalar(0.5);
-				(*fpPtr)[1]=Scalar(y)+Scalar(0.5);
-				fpPtr->value=LensDistortion::Scalar(1);
-				}
-		}
-	else
-		{
-		/* Create lens distortion-corrected pixel positions: */
-		ImagePoint* fpPtr=framePixels;
-		for(unsigned int y=0;y<frameSize[1];++y)
-			for(unsigned int x=0;x<frameSize[0];++x,++fpPtr)
-				{
-				/* Undistort the image point: */
-				LensDistortion::Point dp(LensDistortion::Scalar(x)+LensDistortion::Scalar(0.5),LensDistortion::Scalar(y)+LensDistortion::Scalar(0.5));
-				LensDistortion::Point up=ips.depthLensDistortion.undistortPixel(dp);
-				
-				/* Store the undistorted point: */
-				(*fpPtr)[0]=Scalar(up[0]);
-				(*fpPtr)[1]=Scalar(up[1]);
-				
-				/* Calculate the inverse distortion scale at the undistorted position: */
-				fpPtr->value=LensDistortion::Scalar(1)/ips.depthLensDistortion.distortScalePixel(up);
-				}
-		}
+	/* Pre-compute a 2D array of image pixel positions with averaging weights: */
+	createImagePoints(ips);
 	
 	/* Copy the depth projection matrix: */
 	depthProjection=ips.depthProjection;

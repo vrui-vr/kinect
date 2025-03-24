@@ -1,7 +1,7 @@
 /***********************************************************************
 KinectServer - Server to stream 3D video data from one or more Kinect
 cameras to remote clients for tele-immersion.
-Copyright (c) 2010-2024 Oliver Kreylos
+Copyright (c) 2010-2025 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -145,8 +145,8 @@ void KinectServer::CameraState::startStreaming(const Kinect::FrameSource::Time& 
 void KinectServer::CameraState::writeHeaders(IO::File& sink) const
 	{
 	/* Write the stream format versions: */
-	sink.write<Misc::UInt32>(1);
-	sink.write<Misc::UInt32>(5);
+	sink.write<Misc::UInt32>(2);
+	sink.write<Misc::UInt32>(6);
 	
 	/* Write the camera's depth correction parameters: */
 	if(depthCorrection!=0)
@@ -165,12 +165,13 @@ void KinectServer::CameraState::writeHeaders(IO::File& sink) const
 	sink.write<Misc::UInt8>(0);
 	#endif
 	
-	/* Write the depth camera's lens distortion correction parameters to the sink: */
-	ips.depthLensDistortion.write(sink);
-	
-	/* Write the camera's intrinsic and extrinsic parameters to the sink: */
+	/* Write the color and depth cameras' intrinsic parameters to the sink: */
+	ips.writeLensDistortion(ips.colorLensDistortion,sink);
+	ips.writeLensDistortion(ips.depthLensDistortion,sink);
 	Misc::Marshaller<Kinect::FrameSource::IntrinsicParameters::PTransform>::write(ips.colorProjection,sink);
 	Misc::Marshaller<Kinect::FrameSource::IntrinsicParameters::PTransform>::write(ips.depthProjection,sink);
+	
+	/* Write the source's extrinsic parameters to the sink: */
 	Misc::Marshaller<Kinect::FrameSource::ExtrinsicParameters>::write(eps,sink);
 	
 	/* Write the color and depth compression headers: */

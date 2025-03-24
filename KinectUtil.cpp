@@ -1,7 +1,7 @@
 /***********************************************************************
 KinectUtil - Utility program to detect, list, and configure Kinect
 devices.
-Copyright (c) 2011-2023 Oliver Kreylos
+Copyright (c) 2011-2025 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -37,7 +37,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <USB/Device.h>
 #include <Math/Math.h>
 #include <Math/Matrix.h>
-#include <Kinect/LensDistortion.h>
+#include <Video/LensDistortion.h>
 #include <Kinect/Camera.h>
 #include <Kinect/Config.h>
 #include <Kinect/Internal/Config.h>
@@ -380,7 +380,7 @@ bool downloadCalibration(unsigned int index)
 		std::cout<<dcp.k1<<", "<<dcp.k2<<", "<<dcp.k3<<", "<<dcp.p1<<", "<<dcp.p2<<std::endl;
 		
 		/* Set up a lens distortion corrector: */
-		Kinect::LensDistortion ld;
+		Video::LensDistortion ld;
 		ld.setKappa(0,dcp.k1);
 		ld.setKappa(1,dcp.k2);
 		ld.setKappa(2,dcp.k3);
@@ -446,8 +446,8 @@ bool downloadCalibration(unsigned int index)
 				depthPoint(0)=511.5-double(x);
 				
 				/* Convert pixel from pixel space to undistorted normalized projection space: */
-				Kinect::LensDistortion::Point p((depthPoint(0)-dcp.cx)/dcp.sx,(depthPoint(1)-dcp.cy)/dcp.sy);
-				Kinect::LensDistortion::Point pp=ld.undistort(p);
+				Video::LensDistortion::Point p((depthPoint(0)-dcp.cx)/dcp.sx,(depthPoint(1)-dcp.cy)/dcp.sy);
+				Video::LensDistortion::Point pp=ld.undistort(p);
 				pp[0]*=dcp.sx;
 				pp[1]*=dcp.sy;
 				depthPoint(0)=512.0-(pp[0]+dcp.cx);

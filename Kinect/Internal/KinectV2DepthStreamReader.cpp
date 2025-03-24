@@ -1,7 +1,7 @@
 /***********************************************************************
 KinectV2DepthStreamReader - Class to extract depth images from raw gated
 IR images read from a stream of USB transfer buffers.
-Copyright (c) 2015-2022 Oliver Kreylos
+Copyright (c) 2015-2025 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -28,9 +28,9 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Misc/FunctionCalls.h>
 #include <Math/Math.h>
 #include <Math/Constants.h>
+#include <Video/LensDistortion.h>
 #include <Kinect/FrameBuffer.h>
 #include <Kinect/FrameSource.h>
-#include <Kinect/LensDistortion.h>
 #include <Kinect/CameraV2.h>
 
 // DEBUGGING
@@ -568,7 +568,7 @@ void KinectV2DepthStreamReader::calcXZTables(const KinectV2CommandDispatcher::De
 	double cx=depthCameraParams.cx;
 	double fy=depthCameraParams.sy;
 	double cy=depthCameraParams.cy;
-	LensDistortion ld;
+	Video::LensDistortion ld;
 	ld.setKappa(0,depthCameraParams.k1);
 	ld.setKappa(1,depthCameraParams.k2);
 	ld.setKappa(2,depthCameraParams.k3);
@@ -581,14 +581,14 @@ void KinectV2DepthStreamReader::calcXZTables(const KinectV2CommandDispatcher::De
 	for(int y=0;y<424;++y)
 		{
 		/* Calculate the distorted pixel position in normalized projection space: */
-		LensDistortion::Point dp;
+		Video::LensDistortion::Point dp;
 		dp[1]=(double(y)+0.5-cy)/fy;
 		for(int x=0;x<512;++x,++xTablePtr,++zTablePtr)
 			{
 			dp[0]=(double(x)+0.5-cx)/fx;
 			
 			/* Undistort the pixel position: */
-			LensDistortion::Point up=ld.undistort(dp);
+			Video::LensDistortion::Point up=ld.undistort(dp);
 			
 			/* Calculate the X and Z table entries: */
 			*xTablePtr=8192.0f*float(up[0]); // Correction factor based on x position to account for distance from lens to IR emitter

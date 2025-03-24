@@ -2,7 +2,7 @@
 FrameSaver - Helper class to save raw color and video frames from a
 Kinect camera to a time-stamped file on disk for playback and further
 processing.
-Copyright (c) 2010-2018 Oliver Kreylos
+Copyright (c) 2010-2025 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -49,8 +49,8 @@ Methods of class FrameSaver:
 void FrameSaver::initialize(FrameSource& frameSource)
 	{
 	/* Write the file formats' version numbers to the depth and color files: */
-	colorFrameFile->write<Misc::UInt32>(1);
-	depthFrameFile->write<Misc::UInt32>(5);
+	colorFrameFile->write<Misc::UInt32>(2);
+	depthFrameFile->write<Misc::UInt32>(6);
 	
 	/* Write the frame source's depth correction parameters: */
 	FrameSource::DepthCorrection* dc=frameSource.getDepthCorrectionParameters();
@@ -78,21 +78,15 @@ void FrameSaver::initialize(FrameSource& frameSource)
 	
 	#endif
 	
-	/* Get the frame source's intrinsic calibration parameters: */
+	/* Write the frame source's intrinsic color and depth camera parameters to their respective files: */
 	FrameSource::IntrinsicParameters ips=frameSource.getIntrinsicParameters();
-	
-	/* Write the depth camera's lens distortion parameters: */
-	ips.depthLensDistortion.write(*depthFrameFile);
-	
-	/* Write the color and depth projections to their respective files: */
+	FrameSource::IntrinsicParameters::writeLensDistortion(ips.colorLensDistortion,*colorFrameFile);
 	Misc::Marshaller<FrameSource::IntrinsicParameters::PTransform>::write(ips.colorProjection,*colorFrameFile);
+	FrameSource::IntrinsicParameters::writeLensDistortion(ips.depthLensDistortion,*depthFrameFile);
 	Misc::Marshaller<FrameSource::IntrinsicParameters::PTransform>::write(ips.depthProjection,*depthFrameFile);
 	
-	/* Get the frame source's extrinsic calibration parameters: */
-	FrameSource::ExtrinsicParameters eps=frameSource.getExtrinsicParameters();
-	
-	/* Write the camera transformation to the depth file: */
-	Misc::Marshaller<FrameSource::ExtrinsicParameters>::write(eps,*depthFrameFile);
+	/* Write the frame source's extrinsic camera parameters to the depth file: */
+	Misc::Marshaller<FrameSource::ExtrinsicParameters>::write(frameSource.getExtrinsicParameters(),*depthFrameFile);
 	
 	/* Create the color and depth frame writers: */
 	colorFrameWriter=new ColorFrameWriter(*colorFrameFile,frameSource.getActualFrameSize(FrameSource::COLOR),frameSource.getColorSpace());

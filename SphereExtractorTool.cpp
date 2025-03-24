@@ -1,7 +1,7 @@
 /***********************************************************************
 KinectViewer - Extrinsic calibration tool for KinectViewer using a large
 spherical calibration target.
-Copyright (c) 2014-2020 Oliver Kreylos
+Copyright (c) 2014-2025 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -393,7 +393,7 @@ void SphereExtractorTool::display(GLContextData& contextData) const
 			{
 			/* Draw the spheres in the projector's coordinate system: */
 			glPushMatrix();
-			glMultMatrix((*ksIt)->projector->getProjectorTransform());
+			glMultMatrix((*ksIt)->projector->getExtrinsicParameters());
 			
 			for(SphereExtractor::SphereList::const_iterator sIt=(*ksIt)->sphereExtractor->getSpheres().begin();sIt!=(*ksIt)->sphereExtractor->getSpheres().end();++sIt)
 				{
@@ -418,7 +418,7 @@ void SphereExtractorTool::display(GLContextData& contextData) const
 			{
 			/* Draw the tie points in the projector's coordinate system: */
 			glPushMatrix();
-			glMultMatrix(ssIt->streamer->projector->getProjectorTransform());
+			glMultMatrix(ssIt->streamer->projector->getExtrinsicParameters());
 			
 			glBegin(GL_POINTS);
 			for(std::vector<Point>::const_iterator tpIt=ssIt->tiePoints.begin();tpIt!=ssIt->tiePoints.end();++tpIt)

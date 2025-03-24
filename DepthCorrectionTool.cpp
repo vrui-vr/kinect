@@ -1,6 +1,6 @@
 /***********************************************************************
 DepthCorrectionTool - Calibration tool for RawKinectViewer.
-Copyright (c) 2012-2024 Oliver Kreylos
+Copyright (c) 2012-2025 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -33,8 +33,8 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Geometry/Vector.h>
 #include <Geometry/PCACalculator.h>
 #include <Vrui/ToolManager.h>
+#include <Kinect/FrameSource.h>
 #include <Kinect/Internal/Config.h>
-#include <Kinect/Camera.h>
 
 #include "RawKinectViewer.h"
 
@@ -59,8 +59,8 @@ void DepthCorrectionTool::averageDepthFrameReady(int)
 	float* dfPtr=df.frame.getData<float>();
 	typedef Geometry::PCACalculator<3>::Point PPoint;
 	typedef Geometry::PCACalculator<3>::Vector PVector;
-	typedef Kinect::LensDistortion::Scalar LDScalar;
-	typedef Kinect::LensDistortion::Point LDPoint;
+	typedef Kinect::FrameSource::IntrinsicParameters::Scalar LDScalar;
+	typedef Kinect::FrameSource::IntrinsicParameters::Point2 LDPoint;
 	Geometry::PCACalculator<3> pca;
 	bool applyLensCorrection=!application->intrinsicParameters.depthLensDistortion.isIdentity();
 	for(unsigned int y=0;y<application->depthFrameSize[1];++y)
@@ -78,7 +78,7 @@ void DepthCorrectionTool::averageDepthFrameReady(int)
 				if(applyLensCorrection)
 					{
 					/* Undistort the depth image point: */
-					LDPoint udip=application->intrinsicParameters.depthLensDistortion.undistortPixel(LDPoint(LDScalar(dcp[0]),LDScalar(dcp[1])));
+					LDPoint udip=application->intrinsicParameters.undistortDepthPixel(LDPoint(LDScalar(dcp[0]),LDScalar(dcp[1])));
 					dcp[0]=PPoint::Scalar(udip[0]);
 					dcp[1]=PPoint::Scalar(udip[1]);
 					}
@@ -171,8 +171,8 @@ void DepthCorrectionTool::buttonCallback(int buttonSlotIndex,Vrui::InputDevice::
 			}
 		else
 			{
-			typedef Kinect::LensDistortion::Scalar LDScalar;
-			typedef Kinect::LensDistortion::Point LDPoint;
+			typedef Kinect::FrameSource::IntrinsicParameters::Scalar LDScalar;
+			typedef Kinect::FrameSource::IntrinsicParameters::Point2 LDPoint;
 			
 			/* Initialize the B-spline approximation matrices: */
 			unsigned int numControlPoints=(numSegments[1]+degree)*(numSegments[0]+degree);
@@ -212,7 +212,7 @@ void DepthCorrectionTool::buttonCallback(int buttonSlotIndex,Vrui::InputDevice::
 							/* Calculate the pixel's expected depth value based on the depth plane equation: */
 							LDPoint dip(LDScalar(x)+LDScalar(0.5),LDScalar(y)+LDScalar(0.5));
 							if(applyLensCorrection)
-								dip=application->intrinsicParameters.depthLensDistortion.undistortPixel(dip);
+								dip=application->intrinsicParameters.undistortDepthPixel(dip);
 							
 							double expected=(dfIt->plane.getOffset()-double(dip[0])*dfIt->plane.getNormal()[0]-double(dip[1])*dfIt->plane.getNormal()[1])/dfIt->plane.getNormal()[2];
 							atb(0)+=actual*expected;

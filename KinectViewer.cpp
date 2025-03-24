@@ -1,7 +1,7 @@
 /***********************************************************************
 KinectViewer - Simple application to view 3D reconstructions of color
 and depth images captured from a Kinect device.
-Copyright (c) 2010-2023 Oliver Kreylos
+Copyright (c) 2010-2025 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -286,7 +286,7 @@ void KinectViewer::KinectStreamer::showFromCameraCallback(Misc::CallbackData* cb
 	nav*=Vrui::NavTransform::rotate(Vrui::Rotation::rotateX(Math::rad(Vrui::Scalar(90))));
 	
 	/* Account for the projector's model space transformation: */
-	nav*=Geometry::invert(projector->getProjectorTransform());
+	nav*=Geometry::invert(projector->getExtrinsicParameters());
 	
 	Vrui::setNavigationTransformation(nav);
 	
@@ -489,7 +489,7 @@ void KinectViewer::alignProjectorsCallback(GLMotif::ToggleButton::ValueChangedCa
 		EP extrinsics=EP::translate(EP::Vector(0,EP::Scalar(streamers.size()-1)*Math::div2(EP::Scalar(200)),0));
 		for(std::vector<KinectStreamer*>::iterator sIt=streamers.begin();sIt!=streamers.end();++sIt)
 			{
-			(*sIt)->savedExtrinsics=(*sIt)->projector->getProjectorTransform();
+			(*sIt)->savedExtrinsics=(*sIt)->projector->getExtrinsicParameters();
 			(*sIt)->projector->setExtrinsicParameters(extrinsics);
 			extrinsics.leftMultiply(EP::translate(EP::Vector(0,-200,0)));
 			}
@@ -899,7 +899,7 @@ void KinectViewer::resetNavigation(void)
 		{
 		/* Calculate the world position of a point 1m in front of the streamer's projector: */
 		Kinect::FrameSource::ExtrinsicParameters::Point cp(0.0,0.0,-100.0); // 1m along projection line
-		Vrui::Point wp((*sIt)->projector->getProjectorTransform().transform(cp));
+		Vrui::Point wp((*sIt)->projector->getExtrinsicParameters().transform(cp));
 		
 		#if KINECT_CONFIG_FRAMESOURCE_EXTRINSIC_PROJECTIVE
 		
@@ -908,7 +908,7 @@ void KinectViewer::resetNavigation(void)
 		#else
 		
 		/* Calculate the projector's influence radius: */
-		Vrui::Scalar s((*sIt)->projector->getProjectorTransform().getScaling()*100.0);
+		Vrui::Scalar s((*sIt)->projector->getExtrinsicParameters().getScaling()*100.0);
 		Vrui::Vector ws(s,s,s);
 		
 		#endif

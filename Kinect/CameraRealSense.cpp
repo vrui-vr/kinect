@@ -372,7 +372,7 @@ FrameSource::IntrinsicParameters CameraRealSense::getIntrinsicParameters(void)
 	
 	IntrinsicParameters result;
 	
-	typedef FrameSource::IntrinsicParameters::PTransform PTransform;
+	typedef IntrinsicParameters::PTransform PTransform;
 	
 	/* Calculate the un-projection matrix from 3D depth image space into 3D camera space: */
 	PTransform::Matrix& dum=result.depthProjection.getMatrix();

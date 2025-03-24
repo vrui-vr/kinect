@@ -1,7 +1,7 @@
 /***********************************************************************
 MultiplexedFrameSource - Class to stream several pairs of color and
 depth frames from a single source file or pipe.
-Copyright (c) 2010-2024 Oliver Kreylos
+Copyright (c) 2010-2025 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -82,20 +82,23 @@ MultiplexedFrameSource::Stream::Stream(MultiplexedFrameSource* sOwner,unsigned i
 	/* Check if the depth stream uses lossy compression: */
 	bool depthIsLossy=streamFormatVersions[1]>=3&&source.read<Misc::UInt8>()!=0;
 	
-	/* Check if the depth camera has lens distortion correction parameters: */
-	if(streamFormatVersions[1]>=5)
-		{
-		/* Read the depth camera's lens distortion correction parameters: */
-		ips.depthLensDistortion.read(source);
-		}
+	/* Read the color camera's lens distortion correction parameters if the file stream has it: */
+	if(streamFormatVersions[0]>=2)
+		ips.colorLensDistortion=IntrinsicParameters::readLensDistortion(source,true);
 	
-	/* Read the intrinsic and extrinsic camera parameters from the source: */
+	/* Read the depth camera's lens distortion correction parameters if the file stream has it: */
+	if(streamFormatVersions[1]>=5)
+		ips.depthLensDistortion=IntrinsicParameters::readLensDistortion(source,streamFormatVersions[1]>=6);
+	
+	/* Read the cameras' projections from the source: */
 	ips.colorProjection=Misc::Marshaller<IntrinsicParameters::PTransform>::read(source);
 	ips.depthProjection=Misc::Marshaller<IntrinsicParameters::PTransform>::read(source);
-	eps=Misc::Marshaller<ExtrinsicParameters>::read(source);
 	
-	/* Apply projection parameters to the depth lens distortion corrector: */
-	ips.depthLensDistortion.setProjection(ips.depthProjection);
+	/* Calculate the image-space transformations: */
+	ips.updateTransforms();
+	
+	/* Read the depth camera's extrinsic parameters from the source: */
+	eps=Misc::Marshaller<ExtrinsicParameters>::read(source);
 	
 	/* Create the frame readers: */
 	owner->colorFrameReaders[index]=new ColorFrameReader(source);
