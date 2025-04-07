@@ -354,7 +354,7 @@ Kinect-4.2:
   Kinect::Camera::sendMessage method which caused protocol errors when
   downloading camera calibration data.
 
-Kinect-4.3:
+Kinect-5.0:
 - Bumped Vrui version requirement to 13.0-001.
 - Adapted to Vrui's new project build system.
 - Several changes to Kinect::FrameSource::IntrinsicParameters class.
