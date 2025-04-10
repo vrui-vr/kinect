@@ -24,6 +24,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #define KINECT_CAMERAREALSENSE_INCLUDED
 
 #include <Misc/SizedTypes.h>
+#include <Misc/Autopointer.h>
 #include <Threads/Thread.h>
 #include <GLMotif/ToggleButton.h>
 #include <GLMotif/TextFieldSlider.h>
@@ -32,10 +33,6 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 
 /* Forward declarations: */
 struct rs_device;
-namespace Misc {
-template <class TargetParam>
-class Autopointer;
-}
 namespace Kinect {
 class LibRealSenseContext;
 typedef Misc::Autopointer<LibRealSenseContext> LibRealSenseContextPtr;

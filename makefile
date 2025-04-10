@@ -228,6 +228,11 @@ ifneq ($(SYSTEM_HAVE_REALSENSE),0)
 else
 	@echo "Support for Intel RealSense cameras via first-generation librealsense library disabled"
 endif
+ifneq ($(SYSTEM_HAVE_ORBBEC),0)
+	@echo "Support for Orbbec cameras via first-generation Orbbec SDK enabled"
+else
+	@echo "Support for Orbbec cameras via first-generation Orbbec SDK disabled"
+endif
 ifneq ($(KINECT_USE_PROJECTOR2),0)
 	@echo "GLSL vertex shader-based facade projector selected"
 else
@@ -313,13 +318,18 @@ LIBKINECT_KINECTV2_SOURCES = Kinect/CameraV2.cpp \
 LIBKINECT_REALSENSE_SOURCES = Kinect/CameraRealSense.cpp \
                               Kinect/Internal/LibRealSenseContext.cpp
 
+# Headers and sources to support Orbbec cameras:
+LIBKINECT_ORBBEC_SOURCES = Kinect/CameraOrbbec.cpp \
+                           Kinect/Internal/OrbbecSDKContext.cpp
+
 # Headers and sources for dummy implementations of certain 3D camera types:
 LIBKINECT_DUMMY_SOURCES = Kinect/CameraV2Dummy.cpp \
-                          Kinect/CameraRealSenseDummy.cpp
+                          Kinect/CameraRealSenseDummy.cpp \
+                          Kinect/CameraOrbbecDummy.cpp
 
 # Create list of libKinect external headers and sources:
 LIBKINECT_HEADERS = $(wildcard Kinect/*.h)
-LIBKINECT_SOURCES = $(filter-out $(LIBKINECT_KINECTV2_SOURCES) $(LIBKINECT_REALSENSE_SOURCES) $(LIBKINECT_DUMMY_SOURCES),$(wildcard Kinect/*.cpp) $(wildcard Kinect/Internal/*.cpp))
+LIBKINECT_SOURCES = $(filter-out $(LIBKINECT_KINECTV2_SOURCES) $(LIBKINECT_REALSENSE_SOURCES) $(LIBKINECT_ORBBEC_SOURCES) $(LIBKINECT_DUMMY_SOURCES),$(wildcard Kinect/*.cpp) $(wildcard Kinect/Internal/*.cpp))
 
 LIBKINECT_PACKAGES = MYVIDEO MYGLMOTIF MYIMAGES MYGLGEOMETRY MYGLSUPPORT MYGLWRAPPERS MYGEOMETRY MYMATH MYCLUSTER MYCOMM MYIO MYUSB MYREALTIME MYMISC GL LIBUSB1
 
@@ -337,6 +347,14 @@ ifneq ($(SYSTEM_HAVE_REALSENSE),0)
   LIBKINECT_PACKAGES += REALSENSE
 else
   LIBKINECT_SOURCES += Kinect/CameraRealSenseDummy.cpp
+endif
+
+# Add Orbbec sources if Orbbec SDK is present, otherwise use dummy implementation:
+ifneq ($(SYSTEM_HAVE_ORBBEC),0)
+  LIBKINECT_SOURCES += $(LIBKINECT_ORBBEC_SOURCES)
+  LIBKINECT_PACKAGES += ORBBEC
+else
+  LIBKINECT_SOURCES += Kinect/CameraOrbbecDummy.cpp
 endif
 
 # Make the Kinect library depend on configuration:
