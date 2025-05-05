@@ -3,6 +3,12 @@ README for Kinect 3D Video Capture Project version 5.0
 Copyright (c) 2010-2025 Oliver Kreylos
 ========================================================================
 
+Quick notes
+===========
+
+Please see Installation.md for quick instructions to install the Kinect
+3D Video Capture Project if you already installed the Vrui VR toolkit.
+
 Requirements
 ============
 
