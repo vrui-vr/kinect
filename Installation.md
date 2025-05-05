@@ -58,9 +58,9 @@ a new directory called something like `kinect-main`. Take note of this
 name, and then enter into that directory by entering into the terminal 
 window:
 ```
-$ cd <kinect directory>
+$ cd <Kinect directory>
 ```
-where you replace `<kinect directory>` with the name of the directory 
+where you replace `<Kinect directory>` with the name of the directory 
 where you cloned/unpacked the Kinect package in the previous step, as 
 printed by `ls`.
 
