@@ -1,12 +1,12 @@
 !!! tip
     It is recommended to download or move the source packages for Vrui and the Kinect 3D Video Capture Project into a `src` directory underneath the user's home directory. Otherwise, references to `~/src` in the following instructions need to be changed.
 
-## Step 1: Install Vrui's collaboration infrastructure (optional)
+<!-- ## Step 1: Install Vrui's collaboration infrastructure (optional)
 
 <!-- todo add collab infrastructure to docs and link here -->
-More info about the collaboration infrastructure and the installation guide can be found at [github.com/vrui-vr/collaboration/blob/main/README](https://github.com/vrui-vr/collaboration/blob/main/README).
+More info about the collaboration infrastructure and the installation guide can be found at [github.com/vrui-vr/collaboration/blob/main/README](https://github.com/vrui-vr/collaboration/blob/main/README). -->
 
-## Step 2: Unpack the Kinect 3D Video Capture
+## Step 1: Unpack the Kinect 3D Video Capture
 
 ### Option 1: Downloading and unpacking a zip file from GitHub
 
@@ -77,7 +77,7 @@ where you replace `<Kinect directory>` with the name of the directory where you 
 
     Change the value of `VRUI_MAKEDIR` close to the beginning of the file as follows: `VRUI_MAKEDIR := <Vrui install dir>/share/make`, where <Vrui install dir> is the installation directory chosen when you installed Vrui. Use `$(HOME)` to refer to the user's home directory instead of `~`.
 
-## Step 3: Build the Kinect 3D Video Capture Project
+## Step 2: Build the Kinect 3D Video Capture Project
 
 Run the following from inside the `<Kinect directory>`:
 
@@ -93,7 +93,7 @@ If everything went well the first time, the second run will print:
 make: Nothing to be done for 'all'.
 ```
 
-## Step 5: Install the Kinect 3D Video Capture Project
+## Step 3: Install the Kinect 3D Video Capture Project
 
 If Vrui was installed in `/usr/local` or elsewhere outside the user's home directory:
 
@@ -109,7 +109,7 @@ If Vrui was installed inside the user's home directory:
 make install
 ```
 
-## Step 6: Install a udev rule file to give access to all users (optional, Linux-only)
+## Step 4: Install a udev rule file to give access to all users (optional, Linux-only)
 
 By default, Kinect devices can only be accessed by the root user. This is inconvenient and a security risk, as all Kinect applications must be run as root.
 
