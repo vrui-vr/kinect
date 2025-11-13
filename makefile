@@ -24,7 +24,7 @@
 # matches the default Vrui installation; if Vrui's installation
 # directory was changed during Vrui's installation, the directory below
 # must be adapted.
-VRUI_MAKEDIR = /usr/local/share/Vrui-13.0/make
+VRUI_MAKEDIR = /usr/local/share/Vrui-14.0/make
 
 # Set the following variable to the type of facade projector to be built
 # into the Kinect library. There are currently three types:
@@ -66,8 +66,8 @@ PROJECT_DISPLAYNAME = Kinect 3D Video Capture Project
 
 # Specify version of created dynamic shared libraries
 PROJECT_MAJOR = 5
-PROJECT_MINOR = 0
-PROJECT_NUMERICVERSION = 5000
+PROJECT_MINOR = 1
+PROJECT_NUMERICVERSION = 5001
 
 # Root directory for Collaboration configuration data underneath Vrui's
 # configuration directory:
@@ -485,7 +485,7 @@ SpaceCarver: $(EXEDIR)/SpaceCarver
 ########################################################################
 
 # Make everything depend on configuration:
-$(call PLUGINOBJNAMES,$(wildcard *.cpp)): | $(DEPDIR)/config
+$(call PLUGINOBJNAMES,$(wildcard Vislets/*.cpp)): | $(DEPDIR)/config
 
 # Implicit rule to link vislet plug-ins:
 $(call VISLETNAME,%): PACKAGES = MYKINECT MYVRUI
