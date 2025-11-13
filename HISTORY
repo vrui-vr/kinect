@@ -371,3 +371,5 @@ Kinect-5.0:
 Kinect-5.1:
 - Bumped Vrui version requirement to 14.0-001.
 - Fixed dependency bug in makefile.
+
+Kinect-5.2:

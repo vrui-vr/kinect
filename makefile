@@ -66,8 +66,8 @@ PROJECT_DISPLAYNAME = Kinect 3D Video Capture Project
 
 # Specify version of created dynamic shared libraries
 PROJECT_MAJOR = 5
-PROJECT_MINOR = 1
-PROJECT_NUMERICVERSION = 5001
+PROJECT_MINOR = 2
+PROJECT_NUMERICVERSION = 5002
 
 # Root directory for Collaboration configuration data underneath Vrui's
 # configuration directory:
