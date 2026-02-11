@@ -3,7 +3,7 @@
 !!! info "Heads up!"
     VRUI must be installed before the Kinect package can be installed.
 
-1. Install VRUI [(go to instructions $\rightarrow$)](https://vrui-vr.github.io/docs/vrui/installation/)
+1. Install VRUI [(go to instructions $\rightarrow$)](https://vrui-vr.github.io/vrui/installation/)
 2. Install Kinect package!!!
 
 ## Prerequisites
