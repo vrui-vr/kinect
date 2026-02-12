@@ -1,1 +1,1 @@
-# VRUI Kinect package
+# Vrui Kinect package
