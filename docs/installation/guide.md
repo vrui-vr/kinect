@@ -1,9 +1,9 @@
 !!! tip
     It is recommended to download or move the source packages for Vrui and the Kinect 3D Video Capture Project into a `src` directory underneath the user's home directory. Otherwise, references to `~/src` in the following instructions need to be changed.
 
+<!-- todo add collab infrastructure to docs and link here -->
 <!-- ## Step 1: Install Vrui's collaboration infrastructure (optional)
 
-<!-- todo add collab infrastructure to docs and link here -->
 More info about the collaboration infrastructure and the installation guide can be found at [github.com/vrui-vr/collaboration/blob/main/README](https://github.com/vrui-vr/collaboration/blob/main/README). -->
 
 ## Step 1: Unpack the Kinect 3D Video Capture
@@ -12,7 +12,7 @@ More info about the collaboration infrastructure and the installation guide can 
 
 On [the Kinect repository's main page](https://github.com/vrui-vr/kinect), click on the green "<> Code" button, and then click on "Download ZIP" in the menu that pops up in response.
 
-![Downloading a ZIP from a GitHub repo](download_zip.png)
+<!-- todo fix this: ![Downloading a ZIP from a GitHub repo](download_zip.png) -->
 
 Depending on your browser settings, you may be asked where to store the file being downloaded, or it might be stored in a default location, such as your `Downloads` directory. Take note of what the zip file is called and where it is stored.
 
