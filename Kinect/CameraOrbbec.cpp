@@ -200,29 +200,25 @@ FrameSource::IntrinsicParameters CameraOrbbec::getIntrinsicParameters(void)
 	dMat(1,1)=-1.0/depthIntrinsics.fy;
 	dMat(1,3)=depthIntrinsics.cy/depthIntrinsics.fy;
 	dMat(2,3)=-1.0;
-	dMat(3,2)=-1.0/double(dQuant[0]);
-	dMat(3,3)=double(dQuant[1])/double(dQuant[0]);
+	dMat(3,2)=-1.0/double(zQuant[0]);
+	dMat(3,3)=double(zQuant[1])/double(zQuant[0]);
+	
+	/* Retrieve the color sensor's lens distortion correction coefficients: */
+	result.colorLensDistortion=getLensDistortion(*colorProfile);
+	
+	/* Create the projection from 3D camera space into color image space: */
+	IntrinsicParameters::PTransform::Matrix& cMat=result.colorProjection.getMatrix();
+	cMat=IntrinsicParameters::PTransform::Matrix::zero;
+	OBCameraIntrinsic colorIntrinsics=colorProfile->getIntrinsic();
+	cMat(0,0)=IntrinsicParameters::Scalar(colorIntrinsics.fx);
 	
 	
 	
 	
-	
-	
-	
-	
-	
-	
-	
-	
-	/* Retrieve the color sensor's intrinsic parameters and distortion correction coefficients: */
-	OBCameraIntrinsic colorIntrinsic=colorProfile->getIntrinsic();
 	colorIntrinsic[0]=-intrinsic.fx;
 	colorIntrinsic[1]=float(intrinsic.width)-intrinsic.cx;
 	colorIntrinsic[2]=-intrinsic.fy;
 	colorIntrinsic[3]=float(intrinsic.height)-intrinsic.cy;
-	
-	/* Retrieve the color sensor's lens distortion correction coefficients: */
-	result.colorLensDistortion=getLensDistortion(*colorProfile);
 	
 	
 	
