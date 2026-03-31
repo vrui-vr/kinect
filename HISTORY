@@ -372,4 +372,14 @@ Kinect-5.1:
 - Bumped Vrui version requirement to 14.0-001.
 - Fixed dependency bug in makefile.
 
-Kinect-5.2:
+Kinect-6.0:
+- Bumped Vrui version requirement to 15.0-001.
+- Use optional assignment to VRUI_MAKEDIR in makefile to allow override
+  from environment.
+- Adapt all code to new style of callback management in Vrui:
+  - Replace Misc::FunctionCall with Threads::FunctionCall.
+  - Pass function calls by reference instead of by pointer.
+  - API change in Kinect::FrameSource:
+    - Removed callback parameters from startStreaming method
+    - Added new setColorStreamingCallback, setDepthStreamingCallback,
+      and setStreamingCallbacks methods.

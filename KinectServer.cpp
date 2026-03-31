@@ -1,7 +1,7 @@
 /***********************************************************************
 KinectServer - Server to stream 3D video data from one or more Kinect
 cameras to remote clients for tele-immersion.
-Copyright (c) 2010-2025 Oliver Kreylos
+Copyright (c) 2010-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -30,11 +30,11 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Misc/SizedTypes.h>
 #include <Misc/PrintInteger.h>
 #include <Misc/StdError.h>
-#include <Misc/FunctionCalls.h>
 #include <Misc/Time.h>
 #include <Misc/StandardValueCoders.h>
 #include <Misc/CompoundValueCoders.h>
 #include <Misc/ConfigurationFile.h>
+#include <Threads/FunctionCalls.h>
 #include <USB/DeviceList.h>
 #include <IO/File.h>
 #include <Geometry/GeometryMarshallers.h>
@@ -139,7 +139,8 @@ void KinectServer::CameraState::startStreaming(const Kinect::FrameSource::Time& 
 	{
 	/* Start streaming: */
 	camera->setTimeBase(timeBase);
-	camera->startStreaming(Misc::createFunctionCall(this,&KinectServer::CameraState::colorStreamingCallback),Misc::createFunctionCall(this,&KinectServer::CameraState::depthStreamingCallback));
+	camera->setStreamingCallbacks(*Threads::createFunctionCall(this,&KinectServer::CameraState::colorStreamingCallback),*Threads::createFunctionCall(this,&KinectServer::CameraState::depthStreamingCallback));
+	camera->startStreaming();
 	}
 
 void KinectServer::CameraState::writeHeaders(IO::File& sink) const

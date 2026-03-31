@@ -1,7 +1,7 @@
 /***********************************************************************
 KinectV2JpegStreamReader - Class to read JPEG-compressed RGB images
 asynchronously from a stream of USB transfer buffers.
-Copyright (c) 2014-2022 Oliver Kreylos
+Copyright (c) 2014-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -33,7 +33,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Kinect/FrameSource.h>
 
 /* Forward declarations: */
-namespace Misc {
+namespace Threads {
 template <class ParameterParam>
 class FunctionCall;
 }
@@ -48,7 +48,7 @@ class KinectV2JpegStreamReader
 	{
 	/* Embedded classes: */
 	public:
-	typedef Misc::FunctionCall<const FrameBuffer&> ImageReadyCallback; // Type for functions called when a new color image has been decompressed
+	typedef Threads::FunctionCall<const FrameBuffer&> ImageReadyCallback; // Type for functions called when a new color image has been decompressed
 	
 	/* Elements: */
 	private:
@@ -66,7 +66,7 @@ class KinectV2JpegStreamReader
 	FrameSource::ColorPixel** imageRowPointers; // Array of pointers to image rows to flip image during decompression
 	size_t frameSize; // Total compressed image size for the current image
 	bool error; // Flag to remember errors while decompressing the current image
-	ImageReadyCallback* imageReadyCallback; // Function called whenever a new image has been decompressed
+	ImageReadyCallback* imageReadyCallback; // Function called whenever a new image has been decompressed; this should be a reference but can't be
 	
 	/* Private methods: */
 	void getNextTransfer(void); // Grabs the next transfer buffer from the input queue and sets up the JPEG decompressor's input buffer
@@ -84,7 +84,7 @@ class KinectV2JpegStreamReader
 	
 	/* Methods: */
 	void setForceRgb(bool newForceRgb); // Sets the RGB color space flag
-	void postTransfer(USB::TransferPool::Transfer* newTransfer,USB::TransferPool* newTransferPool) // Appends the given transfer buffer to the input queue
+	void postTransfer(USB::TransferPool::Transfer& newTransfer,USB::TransferPool* newTransferPool) // Appends the given transfer buffer to the input queue
 		{
 		#if 0
 		/* Bail out if the new transfer pool doesn't match the established transfer pool: */
@@ -96,13 +96,13 @@ class KinectV2JpegStreamReader
 		
 		/* Remember if the queue is currently empty, and append the new transfer: */
 		bool empty=inQueue.empty();
-		inQueue.push_back(newTransfer);
+		inQueue.push_back(&newTransfer);
 		
 		/* If the queue was previously empty, the processing thread might be waiting for data: */
 		if(empty)
 			inQueueCond.signal();
 		}
-	USB::TransferPool::UserTransferCallback* startStreaming(USB::TransferPool* newTransferPool,ImageReadyCallback* newImageReadyCallback); // Starts the decompression thread and registers the given callback; returns a callback set up to receive USB transfer buffers
+	USB::TransferPool::UserTransferCallback* startStreaming(USB::TransferPool* newTransferPool,ImageReadyCallback& newImageReadyCallback); // Starts the decompression thread and registers the given callback; returns a callback set up to receive USB transfer buffers
 	void stopStreaming(void); // Stops background decompression
 	};
 

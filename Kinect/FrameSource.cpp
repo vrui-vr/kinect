@@ -1,7 +1,7 @@
 /***********************************************************************
 FrameSource - Base class for objects that create streams of depth and
 color frames.
-Copyright (c) 2011-2025 Oliver Kreylos
+Copyright (c) 2011-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -24,6 +24,8 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Kinect/FrameSource.h>
 
 #include <Misc/SizedTypes.h>
+#include <Misc/StdError.h>
+#include <Threads/FunctionCalls.h>
 #include <IO/File.h>
 #include <Kinect/FrameBuffer.h>
 
@@ -277,26 +279,28 @@ void FrameSource::IntrinsicParameters::updateTransforms(void)
 	{
 	/* Calculate the depth camera's image-to-tangent space transform: */
 	PTransform::Matrix& dpMat=depthProjection.getMatrix();
+	Scalar dpWeight=-dpMat(2,3);
 	ATransform::Matrix& di2tMat=di2t.getMatrix();
-	di2tMat(0,0)=dpMat(0,0)/-dpMat(2,3);
-	di2tMat(0,1)=dpMat(0,1)/-dpMat(2,3);
-	di2tMat(0,2)=dpMat(0,3)/-dpMat(2,3);
-	di2tMat(1,0)=dpMat(1,0)/-dpMat(2,3);
-	di2tMat(1,1)=dpMat(1,1)/-dpMat(2,3);
-	di2tMat(1,2)=dpMat(1,3)/-dpMat(2,3);
+	di2tMat(0,0)=dpMat(0,0)/dpWeight;
+	di2tMat(0,1)=dpMat(0,1)/dpWeight;
+	di2tMat(0,2)=dpMat(0,3)/dpWeight;
+	di2tMat(1,0)=dpMat(1,0)/dpWeight;
+	di2tMat(1,1)=dpMat(1,1)/dpWeight;
+	di2tMat(1,2)=dpMat(1,3)/dpWeight;
 	
 	/* Calculate the inverse: */
 	dt2i=Geometry::invert(di2t);
 	
 	/* Calculate the color camera's image-to-tangent space transform: */
 	PTransform::Matrix& cpMat=colorProjection.getMatrix();
+	Scalar cpWeight=-cpMat(2,3);
 	ATransform::Matrix& ci2tMat=ci2t.getMatrix();
-	ci2tMat(0,0)=cpMat(0,0)/-cpMat(2,3);
-	ci2tMat(0,1)=cpMat(0,1)/-cpMat(2,3);
-	ci2tMat(0,2)=cpMat(0,3)/-cpMat(2,3);
-	ci2tMat(1,0)=cpMat(1,0)/-cpMat(2,3);
-	ci2tMat(1,1)=cpMat(1,1)/-cpMat(2,3);
-	ci2tMat(1,2)=cpMat(1,3)/-cpMat(2,3);
+	ci2tMat(0,0)=cpMat(0,0)/cpWeight;
+	ci2tMat(0,1)=cpMat(0,1)/cpWeight;
+	ci2tMat(0,2)=cpMat(0,3)/cpWeight;
+	ci2tMat(1,0)=cpMat(1,0)/cpWeight;
+	ci2tMat(1,1)=cpMat(1,1)/cpWeight;
+	ci2tMat(1,2)=cpMat(1,3)/cpWeight;
 	
 	/* Calculate the inverse: */
 	ct2i=Geometry::invert(ci2t);
@@ -352,7 +356,7 @@ Methods of class FrameSource:
 ****************************/
 
 FrameSource::FrameSource(void)
-	:colorSpace(RGB)
+	:colorSpace(RGB),streaming(false)
 	{
 	}
 
@@ -376,6 +380,49 @@ FrameSource::DepthRange FrameSource::getDepthRange(void) const
 	{
 	/* Return the full range of theoretically valid depth values: */
 	return DepthRange(0,invalidDepth-1);
+	}
+
+void FrameSource::setColorStreamingCallback(FrameSource::StreamingCallback& newColorStreamingCallback)
+	{
+	/* Throw an exception if currently streaming: */
+	if(streaming)
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Cannot change streaming callback(s) while streaming");
+	
+	/* Replace the current streaming callback: */
+	colorStreamingCallback=&newColorStreamingCallback;
+	}
+
+void FrameSource::setDepthStreamingCallback(FrameSource::StreamingCallback& newDepthStreamingCallback)
+	{
+	/* Throw an exception if currently streaming: */
+	if(streaming)
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Cannot change streaming callback(s) while streaming");
+	
+	/* Replace the current streaming callback: */
+	depthStreamingCallback=&newDepthStreamingCallback;
+	}
+
+void FrameSource::setStreamingCallbacks(FrameSource::StreamingCallback& newColorStreamingCallback,FrameSource::StreamingCallback& newDepthStreamingCallback)
+	{
+	/* Throw an exception if currently streaming: */
+	if(streaming)
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Cannot change streaming callback(s) while streaming");
+	
+	/* Replace the current streaming callbacks: */
+	colorStreamingCallback=&newColorStreamingCallback;
+	depthStreamingCallback=&newDepthStreamingCallback;
+	}
+
+void FrameSource::startStreaming(void)
+	{
+	/* Set the streaming flag: */
+	streaming=true;
+	}
+
+void FrameSource::stopStreaming(void)
+	{
+	/* Reset the streaming flag: */
+	streaming=false;
 	}
 
 }

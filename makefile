@@ -1,6 +1,6 @@
 ########################################################################
 # Makefile for Kinect 3D Video Capture Project.
-# Copyright (c) 2010-2025 Oliver Kreylos
+# Copyright (c) 2010-2026 Oliver Kreylos
 #
 # This file is part of the WhyTools Build Environment.
 # 
@@ -24,7 +24,7 @@
 # matches the default Vrui installation; if Vrui's installation
 # directory was changed during Vrui's installation, the directory below
 # must be adapted.
-VRUI_MAKEDIR = /usr/local/share/Vrui-14.0/make
+VRUI_MAKEDIR ?= /usr/local/share/Vrui-15.0/make
 
 # Set the following variable to the type of facade projector to be built
 # into the Kinect library. There are currently three types:
@@ -65,9 +65,9 @@ PROJECT_NAME = Kinect
 PROJECT_DISPLAYNAME = Kinect 3D Video Capture Project
 
 # Specify version of created dynamic shared libraries
-PROJECT_MAJOR = 5
-PROJECT_MINOR = 2
-PROJECT_NUMERICVERSION = 5002
+PROJECT_MAJOR = 6
+PROJECT_MINOR = 0
+PROJECT_NUMERICVERSION = 6000
 
 # Root directory for Collaboration configuration data underneath Vrui's
 # configuration directory:

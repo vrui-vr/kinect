@@ -1,7 +1,7 @@
 /***********************************************************************
 KinectV2DepthStreamReader - Class to extract depth images from raw gated
 IR images read from a stream of USB transfer buffers.
-Copyright (c) 2015-2025 Oliver Kreylos
+Copyright (c) 2015-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -25,7 +25,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 
 #include <string.h>
 #include <libusb-1.0/libusb.h>
-#include <Misc/FunctionCalls.h>
+#include <Threads/FunctionCalls.h>
 #include <Math/Math.h>
 #include <Math/Constants.h>
 #include <Video/LensDistortion.h>
@@ -617,7 +617,7 @@ void KinectV2DepthStreamReader::setZRange(float newZMin,float newZMax)
 	B=float(dMax)+(float(dMax)*zMin)/(zMax-zMin);
 	}
 
-void KinectV2DepthStreamReader::postTransfer(USB::TransferPool::Transfer* newTransfer,USB::TransferPool* newTransferPool)
+void KinectV2DepthStreamReader::postTransfer(USB::TransferPool::Transfer& newTransfer,USB::TransferPool* newTransferPool)
 	{
 	#if 0
 	/* Bail out if the new transfer pool doesn't match the established transfer pool: */
@@ -626,9 +626,9 @@ void KinectV2DepthStreamReader::postTransfer(USB::TransferPool::Transfer* newTra
 	#endif
 	
 	/* Process all isochronous packets contained in this transfer: */
-	const Misc::UInt8* packetDataPtr=newTransfer->getTransfer().buffer;
-	const libusb_iso_packet_descriptor* packetDescriptorPtr=newTransfer->getTransfer().iso_packet_desc;
-	int numIsoPackets=newTransfer->getTransfer().num_iso_packets;
+	const Misc::UInt8* packetDataPtr=newTransfer.getTransfer().buffer;
+	const libusb_iso_packet_descriptor* packetDescriptorPtr=newTransfer.getTransfer().iso_packet_desc;
+	int numIsoPackets=newTransfer.getTransfer().num_iso_packets;
 	for(int i=0;i<numIsoPackets;++i,++packetDescriptorPtr)
 		{
 		// DEBUGGING
@@ -806,7 +806,7 @@ void KinectV2DepthStreamReader::postTransfer(USB::TransferPool::Transfer* newTra
 		packetDataPtr+=packetDescriptorPtr->length;
 		}
 	
-	transferPool->release(newTransfer);
+	transferPool->release(&newTransfer);
 	}
 
 void KinectV2DepthStreamReader::setRawImageReadyCallback(KinectV2DepthStreamReader::RawImageReadyCallback* newRawImageReadyCallback)
@@ -819,14 +819,13 @@ void KinectV2DepthStreamReader::setRawImageReadyCallback(KinectV2DepthStreamRead
 	delete previousCallback;
 	}
 
-USB::TransferPool::UserTransferCallback*  KinectV2DepthStreamReader::startStreaming(USB::TransferPool* newTransferPool,KinectV2DepthStreamReader::ImageReadyCallback* newImageReadyCallback)
+USB::TransferPool::UserTransferCallback*  KinectV2DepthStreamReader::startStreaming(USB::TransferPool* newTransferPool,KinectV2DepthStreamReader::ImageReadyCallback& newImageReadyCallback)
 	{
 	/* Remember the source transfer pool: */
 	transferPool=newTransferPool;
 	
 	/* Install the callback function: */
-	delete imageReadyCallback;
-	imageReadyCallback=newImageReadyCallback;
+	imageReadyCallback=&newImageReadyCallback;
 	
 	/* Start the phase calculation threads: */
 	for(int exposure=0;exposure<3;++exposure)
@@ -836,7 +835,7 @@ USB::TransferPool::UserTransferCallback*  KinectV2DepthStreamReader::startStream
 	depthThread.start(this,&KinectV2DepthStreamReader::depthThreadMethod);
 	
 	/* Create and return a transfer callback: */
-	return Misc::createFunctionCall(this,&KinectV2DepthStreamReader::postTransfer,newTransferPool);
+	return Threads::createFunctionCall(this,&KinectV2DepthStreamReader::postTransfer,newTransferPool);
 	}
 
 void KinectV2DepthStreamReader::stopStreaming(void)
@@ -852,8 +851,7 @@ void KinectV2DepthStreamReader::stopStreaming(void)
 	/* Forget the assigned transfer pool: */
 	transferPool=0;
 	
-	/* Delete the callback function: */
-	delete imageReadyCallback;
+	/* Forget the callback function: */
 	imageReadyCallback=0;
 	}
 

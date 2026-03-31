@@ -1,7 +1,7 @@
 /***********************************************************************
 MultiplexedFrameSource - Class to stream several pairs of color and
 depth frames from a single source file or pipe.
-Copyright (c) 2010-2025 Oliver Kreylos
+Copyright (c) 2010-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -27,6 +27,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Misc/StdError.h>
 #include <Misc/MessageLogger.h>
 #include <Misc/FunctionCalls.h>
+#include <Threads/FunctionCalls.h>
 #include <Cluster/ClusterPipe.h>
 #include <Geometry/GeometryMarshallers.h>
 #include <Kinect/ColorFrameReader.h>
@@ -41,8 +42,7 @@ Methods of class MultiplexedFrameSource::Stream:
 
 MultiplexedFrameSource::Stream::Stream(MultiplexedFrameSource* sOwner,unsigned int sIndex,IO::File& source)
 	:owner(sOwner),index(sIndex),
-	 depthCorrection(0),
-	 streaming(false),colorStreamingCallback(0),depthStreamingCallback(0)
+	 depthCorrection(0)
 	{
 	/* Register this source with the stream multiplexer: */
 	{
@@ -107,7 +107,7 @@ MultiplexedFrameSource::Stream::Stream(MultiplexedFrameSource* sOwner,unsigned i
 		#if VIDEO_CONFIG_HAVE_THEORA
 		owner->depthFrameReaders[index]=new LossyDepthFrameReader(source);
 		#else
-		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Lossy depth compression not supported due to lack of Theora library");
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Theora library missing; lossy depth compression not supported");
 		#endif
 		}
 	else
@@ -119,14 +119,8 @@ MultiplexedFrameSource::Stream::Stream(MultiplexedFrameSource* sOwner,unsigned i
 
 MultiplexedFrameSource::Stream::~Stream(void)
 	{
-	{
-	Threads::Spinlock::Lock streamingLock(streamingMutex);
-	streaming=false;
-	
-	/* Delete any old streaming callbacks: */
-	delete colorStreamingCallback;
-	delete depthStreamingCallback;
-	}
+	/* Stop streaming, just in case: */
+	stopStreaming();
 	
 	/* Delete the depth correction object: */
 	delete depthCorrection;
@@ -172,30 +166,18 @@ const Size& MultiplexedFrameSource::Stream::getActualFrameSize(int sensor) const
 		return owner->depthFrameReaders[index]->getSize();
 	}
 
-void MultiplexedFrameSource::Stream::startStreaming(FrameSource::StreamingCallback* newColorStreamingCallback,FrameSource::StreamingCallback* newDepthStreamingCallback)
+void MultiplexedFrameSource::Stream::startStreaming(void)
 	{
+	/* Call the base class method: */
 	Threads::Spinlock::Lock streamingLock(streamingMutex);
-	streaming=true;
-	
-	/* Delete any old streaming callbacks: */
-	delete colorStreamingCallback;
-	delete depthStreamingCallback;
-	
-	/* Install the new streaming callbacks: */
-	colorStreamingCallback=newColorStreamingCallback;
-	depthStreamingCallback=newDepthStreamingCallback;
+	FrameSource::startStreaming();
 	}
 
 void MultiplexedFrameSource::Stream::stopStreaming(void)
 	{
+	/* Call the base class method: */
 	Threads::Spinlock::Lock streamingLock(streamingMutex);
-	streaming=false;
-	
-	/* Delete any old streaming callbacks: */
-	delete colorStreamingCallback;
-	colorStreamingCallback=0;
-	delete depthStreamingCallback;
-	depthStreamingCallback=0;
+	FrameSource::stopStreaming();
 	}
 
 /***************************************
@@ -227,7 +209,6 @@ void* MultiplexedFrameSource::receivingThreadMethod(void)
 				if(numMissingColorFrames==0&&numMissingDepthFrames==0)
 					{
 					Threads::Mutex::Lock streamLock(streamMutex);
-					
 					for(unsigned int i=0;i<numStreams;++i)
 						{
 						if(streams[i]!=0)
@@ -273,7 +254,7 @@ void* MultiplexedFrameSource::receivingThreadMethod(void)
 	catch(const std::runtime_error& err)
 		{
 		/* Log an error message: */
-		Misc::formattedUserError("Kinect::MultiplexedFrameSource: Terminating streaming thread due to exception %s",err.what());
+		Misc::sourcedUserError(__PRETTY_FUNCTION__,"Terminating streaming thread due to exception %s",err.what());
 		}
 	
 	return 0;
@@ -332,7 +313,7 @@ MultiplexedFrameSource::MultiplexedFrameSource(Comm::PipePtr sPipe)
 			{
 			streams[i]=new Stream(this,i,*pipe);
 			}
-		catch(const std::runtime_error& err)
+		catch(const std::runtime_error&)
 			{
 			/* Signal an error to clean up later: */
 			allStreamsOk=false;

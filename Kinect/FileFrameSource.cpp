@@ -1,7 +1,7 @@
 /***********************************************************************
 FileFrameSource - Class to stream depth and color frames from a pair of
 time-stamped depth and color stream files.
-Copyright (c) 2010-2025 Oliver Kreylos
+Copyright (c) 2010-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -27,6 +27,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Misc/FunctionCalls.h>
 #include <Misc/StdError.h>
 #include <Misc/MessageLogger.h>
+#include <Threads/FunctionCalls.h>
 #include <IO/OpenFile.h>
 #include <Math/Constants.h>
 #include <Geometry/GeometryMarshallers.h>
@@ -108,7 +109,7 @@ void FileFrameSource::initialize(void)
 		depthFrameReader=new LossyDepthFrameReader(*depthFrameFile);
 		#else
 		delete colorFrameReader;
-		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Lossy depth compression not supported due to lack of Theora library");
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Theora library missing; lossy depth compression not supported");
 		#endif
 		}
 	else
@@ -143,7 +144,7 @@ void* FileFrameSource::colorStreamingThreadMethod(void)
 	catch(const std::runtime_error& err)
 		{
 		/* Print an error message: */
-		Misc::formattedUserError("Kinect::FileFrameSource::colorStreamingThreadMethod: Terminating color streaming due to exception %s",err.what());
+		Misc::sourcedUserError(__PRETTY_FUNCTION__,"Terminating color streaming due to exception %s",err.what());
 		}
 	
 	return 0;
@@ -155,7 +156,7 @@ void FileFrameSource::processBackground(FrameBuffer& depthFrame)
 		{
 		/* Add the depth frame to the background frame: */
 		DepthPixel* bfPtr=backgroundFrame;
-		DepthPixel* bfEnd=bfPtr+depthSize.volume();
+		DepthPixel* bfEnd=bfPtr+backgroundFrameSize;
 		const DepthPixel* dfPtr=depthFrame.getData<DepthPixel>();
 		for(;bfPtr!=bfEnd;++bfPtr,++dfPtr)
 			if(*bfPtr>*dfPtr)
@@ -167,7 +168,7 @@ void FileFrameSource::processBackground(FrameBuffer& depthFrame)
 		{
 		/* Remove background pixels from the depth frame: */
 		DepthPixel* dfPtr=depthFrame.getData<DepthPixel>();
-		DepthPixel* dfEnd=dfPtr+depthSize.volume();
+		DepthPixel* dfEnd=dfPtr+backgroundFrameSize;
 		const DepthPixel* bfPtr=backgroundFrame;
 		for(;dfPtr!=dfEnd;++dfPtr,++bfPtr)
 			if(*dfPtr>=*bfPtr)
@@ -261,7 +262,7 @@ void* FileFrameSource::depthStreamingThreadMethod(void)
 	catch(const std::runtime_error& err)
 		{
 		/* Print an error message: */
-		Misc::formattedUserError("Kinect::FileFrameSource::depthStreamingThreadMethod: Terminating depth streaming due to exception %s",err.what());
+		Misc::sourcedUserError(__PRETTY_FUNCTION__,"Terminating depth streaming due to exception %s",err.what());
 		}
 	
 	return 0;
@@ -272,8 +273,8 @@ FileFrameSource::FileFrameSource(const char* colorFrameFileName,const char* dept
 	 depthFrameFile(IO::openFile(depthFrameFileName)),
 	 colorFrameReader(0),depthFrameReader(0),
 	 depthCorrection(0),
-	 runStreamingThreads(false),colorStreamingCallback(0),depthStreamingCallback(0),
-	 numBackgroundFrames(0),backgroundFrame(0),removeBackground(false)
+	 runStreamingThreads(false),
+	 numBackgroundFrames(0),backgroundFrameSize(0),backgroundFrame(0),removeBackground(false)
 	{
 	/* Initialize the frame files: */
 	colorFrameFile->setEndianness(Misc::LittleEndian);
@@ -286,8 +287,8 @@ FileFrameSource::FileFrameSource(const char* colorFrameFileName,const char* dept
 FileFrameSource::FileFrameSource(IO::DirectoryPtr directory,const char* fileNamePrefix)
 	:colorFrameReader(0),depthFrameReader(0),
 	 depthCorrection(0),
-	 runStreamingThreads(false),colorStreamingCallback(0),depthStreamingCallback(0),
-	 numBackgroundFrames(0),backgroundFrame(0),removeBackground(false)
+	 runStreamingThreads(false),
+	 numBackgroundFrames(0),backgroundFrameSize(0),backgroundFrame(0),removeBackground(false)
 	{
 	/* Open and initialize the frame files: */
 	std::string colorFileName=fileNamePrefix;
@@ -308,8 +309,8 @@ FileFrameSource::FileFrameSource(IO::FilePtr sColorFrameFile,IO::FilePtr sDepthF
 	 depthFrameFile(sDepthFrameFile),
 	 colorFrameReader(0),depthFrameReader(0),
 	 depthCorrection(0),
-	 runStreamingThreads(false),colorStreamingCallback(0),depthStreamingCallback(0),
-	 numBackgroundFrames(0),backgroundFrame(0),removeBackground(false)
+	 runStreamingThreads(false),
+	 numBackgroundFrames(0),backgroundFrameSize(0),backgroundFrame(0),removeBackground(false)
 	{
 	/* Initialize the file frame source: */
 	initialize();
@@ -327,7 +328,7 @@ FileFrameSource::~FileFrameSource(void)
 	delete colorFrameReader;
 	delete depthFrameReader;
 	
-	/* Delete allocated frame buffers: */
+	/* Release the background frame buffer: */
 	delete[] backgroundFrame;
 	}
 
@@ -360,15 +361,12 @@ const Size& FileFrameSource::getActualFrameSize(int sensor) const
 		return depthSize;
 	}
 
-void FileFrameSource::startStreaming(FrameSource::StreamingCallback* newColorStreamingCallback,FrameSource::StreamingCallback* newDepthStreamingCallback)
+void FileFrameSource::startStreaming(void)
 	{
-	/* Set the streaming callbacks: */
-	delete colorStreamingCallback;
-	colorStreamingCallback=newColorStreamingCallback;
-	delete depthStreamingCallback;
-	depthStreamingCallback=newDepthStreamingCallback;
+	/* Call the base class method: */
+	FrameSource::startStreaming();
 	
-	/* Start the playback threads: */
+	/* Start the playback threads if any streaming callbacks are registered: */
 	runStreamingThreads=colorStreamingCallback!=0||depthStreamingCallback!=0;
 	if(colorStreamingCallback!=0)
 		colorStreamingThread.start(this,&FileFrameSource::colorStreamingThreadMethod);
@@ -378,6 +376,10 @@ void FileFrameSource::startStreaming(FrameSource::StreamingCallback* newColorStr
 
 void FileFrameSource::stopStreaming(void)
 	{
+	/* Bail out if not actually streaming: */
+	if(!streaming)
+		return;
+	
 	/* Stop the streaming threads: */
 	runStreamingThreads=false;
 	if(colorStreamingCallback!=0)
@@ -385,11 +387,8 @@ void FileFrameSource::stopStreaming(void)
 	if(depthStreamingCallback!=0)
 		depthStreamingThread.join();
 	
-	/* Delete the callbacks: */
-	delete colorStreamingCallback;
-	colorStreamingCallback=0;
-	delete depthStreamingCallback;
-	depthStreamingCallback=0;
+	/* Call the base class method: */
+	FrameSource::stopStreaming();
 	}
 
 FrameBuffer FileFrameSource::readNextColorFrame(void)
@@ -405,12 +404,17 @@ FrameBuffer FileFrameSource::readNextDepthFrame(void)
 void FileFrameSource::captureBackground(unsigned int newNumBackgroundFrames)
 	{
 	/* Initialize the background frame buffer: */
-	if(backgroundFrame==0)
-		backgroundFrame=new DepthPixel[depthSize.volume()];
+	size_t depthFrameSize=depthSize.volume();
+	if(backgroundFrame==0||backgroundFrameSize!=depthFrameSize)
+		{
+		delete[] backgroundFrame;
+		backgroundFrameSize=depthFrameSize;
+		backgroundFrame=new DepthPixel[backgroundFrameSize];
+		}
 	
 	/* Initialize the background frame to "empty:" */
 	DepthPixel* bfPtr=backgroundFrame;
-	DepthPixel* bfEnd=bfPtr+depthSize.volume();
+	DepthPixel* bfEnd=bfPtr+backgroundFrameSize;
 	for(;bfPtr!=bfEnd;++bfPtr)
 		*bfPtr=invalidDepth;
 	

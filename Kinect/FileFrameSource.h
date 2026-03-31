@@ -1,7 +1,7 @@
 /***********************************************************************
 FileFrameSource - Class to stream depth and color frames from a pair of
 time-stamped depth and color stream files.
-Copyright (c) 2010-2022 Oliver Kreylos
+Copyright (c) 2010-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -52,18 +52,17 @@ class FileFrameSource:public FrameSource
 	IntrinsicParameters intrinsicParameters; // Intrinsic parameters read from the color and depth files
 	ExtrinsicParameters extrinsicParameters; // Extrinsic parameters read from the color and depth files
 	volatile bool runStreamingThreads; // Flag to shut down the streaming threads
-	StreamingCallback* colorStreamingCallback; // Callback to be called when a new color frame has been loaded
 	Threads::Thread colorStreamingThread; // Thread streaming color frames
-	StreamingCallback* depthStreamingCallback; // Callback to be called when a new depth frame has been loaded
 	Threads::Thread depthStreamingThread; // Thread streaming depth frames
 	unsigned int numBackgroundFrames; // Number of background frames left to capture
+	size_t backgroundFrameSize; // Number of pixels in the current background frame
 	DepthPixel* backgroundFrame; // Frame containing minimal depth values for a captured background
 	bool removeBackground; // Flag whether to remove background information during frame processing
 	
 	/* Private methods: */
 	void initialize(void);
 	void* colorStreamingThreadMethod(void); // Thread method streaming color frames
-	void processBackground(FrameBuffer& depthFrame); // Runs a depth frame through background capture or removal
+	void processBackground(FrameBuffer& depthFrame); // Runs a depth frame through background capture and/or removal
 	void* depthStreamingThreadMethod(void); // Thread method streaming depth frames
 	
 	/* Constructors and destructors: */
@@ -78,7 +77,7 @@ class FileFrameSource:public FrameSource
 	virtual IntrinsicParameters getIntrinsicParameters(void);
 	virtual ExtrinsicParameters getExtrinsicParameters(void);
 	virtual const Size& getActualFrameSize(int sensor) const;
-	virtual void startStreaming(StreamingCallback* newColorStreamingCallback,StreamingCallback* newDepthStreamingCallback);
+	virtual void startStreaming(void);
 	virtual void stopStreaming(void);
 	
 	/* New methods: */

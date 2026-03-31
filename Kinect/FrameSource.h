@@ -1,7 +1,7 @@
 /***********************************************************************
 FrameSource - Base class for objects that create streams of depth and
 color frames.
-Copyright (c) 2011-2025 Oliver Kreylos
+Copyright (c) 2011-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -25,6 +25,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #define KINECT_FRAMESOURCE_INCLUDED
 
 #include <Misc/SizedTypes.h>
+#include <Misc/Autopointer.h>
 #include <Realtime/Time.h>
 #include <Math/Interval.h>
 #if !KINECT_CONFIG_FRAMESOURCE_EXTRINSIC_PROJECTIVE
@@ -37,7 +38,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Kinect/Types.h>
 
 /* Forward declarations: */
-namespace Misc {
+namespace Threads {
 template <class ParameterParam>
 class FunctionCall;
 }
@@ -70,7 +71,7 @@ class FrameSource
 	typedef Math::Interval<DepthPixel> DepthRange; // Type for ranges of depth pixel values
 	typedef Misc::UInt8 ColorComponent; // Type for color pixel components
 	
-	struct ColorPixel // Type for color pixels
+	struct ColorPixel // Type for color pixels in RGB or Y'CbCr color space
 		{
 		/* Embedded classes: */
 		public:
@@ -177,13 +178,16 @@ class FrameSource
 	#else
 	typedef Geometry::OrthogonalTransformation<double,3> ExtrinsicParameters; // Type for extrinsic camera parameters
 	#endif
-	typedef Misc::FunctionCall<const FrameBuffer&> StreamingCallback; // Function call type for streaming color or depth image capture callback
+	typedef Threads::FunctionCall<const FrameBuffer&> StreamingCallback; // Function call type for streaming color or depth image capture callback
+	typedef Misc::Autopointer<StreamingCallback> StreamingCallbackPtr; // Type for smart pointers to streaming callbacks
 	
 	static const DepthPixel invalidDepth=0x07ffU; // The depth value indicating an invalid (or removed) pixel
 	
 	protected:
 	ColorSpace colorSpace; // Color space used by the source's color stream
 	Time timeBase; // Time base point for timestamp calculation
+	StreamingCallbackPtr colorStreamingCallback,depthStreamingCallback; // Callbacks called when a new color or depth frame is available, respectively
+	bool streaming; // Flag whether the frame source is currently streaming color and/or depth frames
 	
 	/* Constructors and destructors: */
 	public:
@@ -201,8 +205,11 @@ class FrameSource
 	virtual ExtrinsicParameters getExtrinsicParameters(void) =0; // Returns the extrinsic camera parameters, i.e., the virtual cameras' position and orientation in 3D world space
 	virtual const Size& getActualFrameSize(int sensor) const =0; // Returns the selected frame size of the color or depth stream as an array of (width, height) in pixels
 	virtual DepthRange getDepthRange(void) const; // Returns the range of valid depth pixel values delivered by this frame source
-	virtual void startStreaming(StreamingCallback* newColorStreamingCallback,StreamingCallback* newDepthStreamingCallback) =0; // Installs the given streaming callback and starts receiving color and depth frames
-	virtual void stopStreaming(void) =0; // Stops streaming; blocks until all pending frame transfers have either completed or been cancelled
+	virtual void setColorStreamingCallback(StreamingCallback& newColorStreamingCallback); // Installs the given color streaming callback; throws an exception if the frame source is currently streaming
+	virtual void setDepthStreamingCallback(StreamingCallback& newDepthStreamingCallback); // Installs the given depth streaming callback; throws an exception if the frame source is currently streaming
+	virtual void setStreamingCallbacks(StreamingCallback& newColorStreamingCallback,StreamingCallback& newDepthStreamingCallback); // Installs the given color and depth streaming callbacks; throws an exception if the frame source is currently streaming
+	virtual void startStreaming(void); // Starts receiving and streaming color and/or depth frames
+	virtual void stopStreaming(void); // Stops streaming; blocks until all pending frame transfers have either completed or been cancelled
 	};
 
 }

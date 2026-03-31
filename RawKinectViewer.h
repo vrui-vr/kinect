@@ -1,7 +1,7 @@
 /***********************************************************************
 RawKinectViewer - Simple application to view color and depth images
 captured from a Kinect device.
-Copyright (c) 2010-2022 Oliver Kreylos
+Copyright (c) 2010-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -24,7 +24,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #ifndef RAWKINECTVIEWER_INCLUDED
 #define RAWKINECTVIEWER_INCLUDED
 
-#include <Misc/FunctionCalls.h>
+#include <Misc/Autopointer.h>
 #include <Threads/Spinlock.h>
 #include <Threads/TripleBuffer.h>
 #include <Geometry/Plane.h>
@@ -40,6 +40,10 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Kinect/DirectFrameSource.h>
 
 /* Forward declarations: */
+namespace Threads {
+template <class ParameterParam>
+class FunctionCall;
+}
 namespace GLMotif {
 class PopupMenu;
 class PopupWindow;
@@ -60,8 +64,10 @@ class RawKinectViewer:public Vrui::Application,public GLObject
 	typedef IntrinsicParameters::PTransform PTransform; // Type for depth camera unprojection and color camera projection matrices
 	typedef PTransform::Point CPoint; // Type for camera-space points
 	typedef PTransform::Vector CVector; // Type for camera-space vectors
-	typedef Misc::FunctionCall<int> AverageFrameReadyCallback; // Type for callbacks when an average depth frame has been captured; int argument is a dummy
-	typedef Misc::FunctionCall<const Kinect::FrameBuffer&> FrameStreamingCallback; // Type for callbacks when a color or depth frame arrives from the camera
+	typedef Threads::FunctionCall<int> AverageFrameReadyCallback; // Type for callbacks when an average depth frame has been captured; int argument is a dummy
+	typedef Misc::Autopointer<AverageFrameReadyCallback> AverageFrameReadyCallbackPtr; // Type for pointers to callbacks when an average depth frame has been captured
+	typedef Kinect::FrameSource::StreamingCallback FrameStreamingCallback; // Type for callbacks when a color or depth frame arrives from the camera
+	typedef Kinect::FrameSource::StreamingCallbackPtr FrameStreamingCallbackPtr; // Type for pointers to callbacks when a color or depth frame arrives from the camera
 	
 	struct DataItem:public GLObject::DataItem
 		{
@@ -92,8 +98,8 @@ class RawKinectViewer:public Vrui::Application,public GLObject
 	/* Elements: */
 	Kinect::DirectFrameSource* camera; // Pointer to a directly-connected depth camera
 	Threads::Spinlock frameCallbacksMutex; // Mutex serializing access to the frame streaming callbacks
-	std::vector<FrameStreamingCallback*> colorFrameCallbacks; // List of callbacks to be called when a new color frame arrives
-	std::vector<FrameStreamingCallback*> depthFrameCallbacks; // List of callbacks to be called when a new depth frame arrives
+	std::vector<FrameStreamingCallbackPtr> colorFrameCallbacks; // List of callbacks to be called when a new color frame arrives
+	std::vector<FrameStreamingCallbackPtr> depthFrameCallbacks; // List of callbacks to be called when a new depth frame arrives
 	Size colorFrameSize; // Size of color frames in pixels
 	unsigned int backgroundCaptureNumFrames; // Number of color background frames left to capture
 	Kinect::FrameSource::ColorPixel* colorBackground; // Frame buffer for color frame background removal
@@ -111,7 +117,7 @@ class RawKinectViewer:public Vrui::Application,public GLObject
 	bool paused; // Flag whether the video stream display is paused
 	unsigned int averageNumFrames; // Number of depth frames to average
 	unsigned int averageFrameCounter; // Number of depth frames still to accumulate
-	std::vector<AverageFrameReadyCallback*> averageFrameReadyCallbacks; // Functions called when a new average depth frame has been captured
+	std::vector<AverageFrameReadyCallbackPtr> averageFrameReadyCallbacks; // Functions called when a new average depth frame has been captured
 	float* averageFrameDepth; // Average depth values in depth frame
 	float* averageFrameForeground; // Ratio of foreground vs background in depth frame
 	bool averageFrameValid; // Flag whether the average depth frame buffer is currently valid
@@ -133,13 +139,14 @@ class RawKinectViewer:public Vrui::Application,public GLObject
 	float getDepthImagePixel(const Offset& pixel) const; // Returns the average or current depth value of the given depth image pixel
 	CPoint getDepthImagePoint(const Offset& pixel) const; // Returns the distortion-corrected image-space position of the given depth image pixel
 	CPoint getDepthImagePoint(const Vrui::Point& imagePoint) const; // Returns the image-space point at the given image-plane position
-	void registerColorCallback(FrameStreamingCallback* newCallback); // Registers a callback to be called when a new color frame arrives; does not adopt callback object
-	void unregisterColorCallback(FrameStreamingCallback* callback); // Unregisters a color streaming callback
-	void registerDepthCallback(FrameStreamingCallback* newCallback); // Registers a callback to be called when a new depth frame arrives; does not adopt callback object
-	void unregisterDepthCallback(FrameStreamingCallback* callback); // Unregisters a depth streaming callback
+	void registerColorCallback(FrameStreamingCallback& newCallback); // Registers a callback to be called when a new color frame arrives
+	void unregisterColorCallback(FrameStreamingCallback& callback); // Unregisters a color streaming callback
+	void registerDepthCallback(FrameStreamingCallback& newCallback); // Registers a callback to be called when a new depth frame arrives
+	void unregisterDepthCallback(FrameStreamingCallback& callback); // Unregisters a depth streaming callback
 	void colorStreamingCallback(const Kinect::FrameBuffer& frameBuffer); // Callback receiving color frames from the Kinect camera
 	void depthStreamingCallback(const Kinect::FrameBuffer& frameBuffer); // Callback receiving depth frames from the Kinect camera
-	void requestAverageFrame(AverageFrameReadyCallback* callback); // Requests collection of an average depth frame; given function will be called when it's ready
+	void requestAverageFrame(void); // Requests collection of an average depth frame
+	void requestAverageFrame(AverageFrameReadyCallback& callback); // Ditto, calls given function when the average frame is ready
 	void locatorButtonPressCallback(Vrui::LocatorTool::ButtonPressCallbackData* cbData); // Callback when a locator tool's button is pressed
 	void minDepthSliderValueChangedCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
 	void maxDepthSliderValueChangedCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);

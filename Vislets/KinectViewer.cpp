@@ -1,7 +1,7 @@
 /***********************************************************************
 KinectViewer - Vislet to draw 3D reconstructions captured from a Kinect
 device in 3D space.
-Copyright (c) 2010-2025 Oliver Kreylos
+Copyright (c) 2010-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -29,11 +29,11 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <iostream>
 #include <Misc/SizedTypes.h>
 #include <Misc/StdError.h>
-#include <Misc/FunctionCalls.h>
 #include <Misc/PrintInteger.h>
 #include <Misc/ValueCoder.h>
 #include <Misc/StandardValueCoders.h>
 #include <Misc/ConfigurationFile.h>
+#include <Threads/FunctionCalls.h>
 #include <IO/OpenFile.h>
 #include <Comm/OpenPipe.h>
 #include <Math/Constants.h>
@@ -225,13 +225,14 @@ void KinectViewer::LiveRenderer::startStreaming(const Kinect::FrameSource::Time&
 	#if !KINECT_CONFIG_USE_SHADERPROJECTOR
 	
 	/* Hook this renderer into the projector's mesh callback: */
-	projector->startStreaming(Misc::createFunctionCall(this,&KinectViewer::LiveRenderer::meshStreamingCallback));
+	projector->startStreaming(*Threads::createFunctionCall(this,&KinectViewer::LiveRenderer::meshStreamingCallback));
 	
 	#endif
 	
 	/* Hook this renderer into the frame source and start streaming: */
 	source->setTimeBase(timeBase);
-	source->startStreaming(Misc::createFunctionCall(this,&KinectViewer::LiveRenderer::colorStreamingCallback),Misc::createFunctionCall(this,&KinectViewer::LiveRenderer::depthStreamingCallback));
+	source->setStreamingCallbacks(*Threads::createFunctionCall(this,&KinectViewer::LiveRenderer::colorStreamingCallback),*Threads::createFunctionCall(this,&KinectViewer::LiveRenderer::depthStreamingCallback));
+	source->startStreaming();
 	
 	started=true;
 	}

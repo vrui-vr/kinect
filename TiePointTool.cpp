@@ -1,6 +1,6 @@
 /***********************************************************************
 TiePointTool - Calibration tool for RawKinectViewer.
-Copyright (c) 2010-2023 Oliver Kreylos
+Copyright (c) 2010-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -26,9 +26,9 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <vector>
 #include <iostream>
 #include <Misc/SizedTypes.h>
-#include <Misc/FunctionCalls.h>
 #include <Misc/MessageLogger.h>
 #include <Misc/FileTests.h>
+#include <Threads/FunctionCalls.h>
 #include <IO/File.h>
 #include <IO/OpenFile.h>
 #include <Math/Math.h>
@@ -441,7 +441,7 @@ void TiePointTool::initialize(void)
 	cornerExtractor->setInputGamma(2.2f);
 	cornerExtractor->setNormalizationWindowSize(48);
 	cornerExtractor->setRegionThreshold(64U);
-	colorFrameCallback=Misc::createFunctionCall(cornerExtractor,&Kinect::CornerExtractor::submitFrame);
+	colorFrameCallback=Threads::createFunctionCall(cornerExtractor,&Kinect::CornerExtractor::submitFrame);
 	
 	/* Set up the depth frame processing pipeline: */
 	diskExtractor=new Kinect::DiskExtractor(application->depthFrameSize,application->depthCorrection,application->intrinsicParameters);
@@ -450,25 +450,23 @@ void TiePointTool::initialize(void)
 	diskExtractor->setDiskRadius(6.0);
 	diskExtractor->setDiskRadiusMargin(1.1);
 	diskExtractor->setDiskFlatness(25.0);
-	depthFrameCallback=Misc::createFunctionCall(diskExtractor,&Kinect::DiskExtractor::submitFrame);
+	depthFrameCallback=Threads::createFunctionCall(diskExtractor,&Kinect::DiskExtractor::submitFrame);
 	
 	/* Start processing on both pipelines: */
-	cornerExtractor->startStreaming(Misc::createFunctionCall(this,&TiePointTool::cornerExtractionCallback));
-	diskExtractor->startStreaming(Misc::createFunctionCall(this,&TiePointTool::diskExtractionCallback));
+	cornerExtractor->startStreaming(*Threads::createFunctionCall(this,&TiePointTool::cornerExtractionCallback));
+	diskExtractor->startStreaming(*Threads::createFunctionCall(this,&TiePointTool::diskExtractionCallback));
 	
 	/* Register streaming callbacks with the RawKinectViewer application: */
-	application->registerColorCallback(colorFrameCallback);
-	application->registerDepthCallback(depthFrameCallback);
+	application->registerColorCallback(*colorFrameCallback);
+	application->registerDepthCallback(*depthFrameCallback);
 	}
 
 void TiePointTool::deinitialize(void)
 	{
 	/* Unregister the color and depth streaming callbacks: */
-	application->unregisterColorCallback(colorFrameCallback);
-	delete colorFrameCallback;
+	application->unregisterColorCallback(*colorFrameCallback);
 	colorFrameCallback=0;
-	application->unregisterDepthCallback(depthFrameCallback);
-	delete depthFrameCallback;
+	application->unregisterDepthCallback(*depthFrameCallback);
 	depthFrameCallback=0;
 	
 	/* Shut down the color and depth frame processing pipelines: */

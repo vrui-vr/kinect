@@ -1,7 +1,7 @@
 /***********************************************************************
 KinectViewer - Vislet to draw 3D reconstructions captured from a Kinect
 device in 3D space.
-Copyright (c) 2010-2023 Oliver Kreylos
+Copyright (c) 2010-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -65,7 +65,7 @@ class KinectViewerFactory:public Vrui::VisletFactory
 	KinectViewerFactory(Vrui::VisletManager& visletManager);
 	virtual ~KinectViewerFactory(void);
 	
-	/* Methods from Vrui::Vislet: */
+	/* Methods from class Vrui::VisletFactory: */
 	virtual Vrui::Vislet* createVislet(int numVisletArguments,const char* const visletArguments[]) const;
 	virtual void destroyVislet(Vrui::Vislet* vislet) const;
 	};
@@ -121,7 +121,7 @@ class KinectViewer:public Vrui::Vislet
 		LiveRenderer(Kinect::FrameSource* sSource); // Creates a renderer for the given 3D video source and saves streams from source if save file name is non-empty; adopts source object
 		virtual ~LiveRenderer(void);
 		
-		/* Methods from Renderer: */
+		/* Methods from class Renderer: */
 		virtual void startStreaming(const Kinect::FrameSource::Time& timeBase);
 		virtual void frame(double newTimeStamp);
 		
@@ -148,7 +148,7 @@ class KinectViewer:public Vrui::Vislet
 		TrackedRenderer(Kinect::FrameSource* sSource,Vrui::InputDevice* sTrackingDevice); // Creates a renderer for the given 3D video source and tracked input device and saves streams from source if save file name is non-empty; adopts source object
 		virtual ~TrackedRenderer(void);
 		
-		/* Methods from Renderer: */
+		/* Methods from class Renderer: */
 		virtual void startStreaming(const Kinect::FrameSource::Time& timeBase);
 		virtual void frame(double newTimeStamp);
 		virtual void glRenderAction(GLContextData& contextData) const;
@@ -203,7 +203,7 @@ class KinectViewer:public Vrui::Vislet
 		SynchedRenderer(const std::string& fileName,double sColorFrameOffset,double sDepthFrameOffset); // Creates a renderer for the given 3D video stream file and time offsets
 		virtual ~SynchedRenderer(void);
 		
-		/* Methods from Renderer: */
+		/* Methods from class Renderer: */
 		virtual void startStreaming(const Kinect::FrameSource::Time& timeBase);
 		virtual void frame(double newTimeStamp);
 		
@@ -225,7 +225,7 @@ class KinectViewer:public Vrui::Vislet
 		public:
 		TrackedSynchedRenderer(const std::string& fileName,Vrui::InputDevice* sTrackingDevice,double sColorFrameOffset,double sDepthFrameOffset); // Creates a renderer for the given 3D video stream file and tracked input device
 		
-		/* Methods from Renderer: */
+		/* Methods from class Renderer: */
 		virtual void frame(double newTimeStamp);
 		virtual void glRenderAction(GLContextData& contextData) const;
 		};

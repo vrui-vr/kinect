@@ -1,6 +1,6 @@
 /***********************************************************************
 TiePointTool - Calibration tool for RawKinectViewer.
-Copyright (c) 2010-2023 Oliver Kreylos
+Copyright (c) 2010-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -71,8 +71,8 @@ class TiePointTool:public Vrui::Tool,public Vrui::Application::Tool<RawKinectVie
 	/* Elements: */
 	private:
 	static TiePointToolFactory* factory; // Pointer to the factory object for this class
-	RawKinectViewer::FrameStreamingCallback* colorFrameCallback; // Color streaming callback registered with RawKinectViewer application
-	RawKinectViewer::FrameStreamingCallback* depthFrameCallback; // Depth streaming callback registered with RawKinectViewer application
+	RawKinectViewer::FrameStreamingCallbackPtr colorFrameCallback; // Color streaming callback registered with RawKinectViewer application
+	RawKinectViewer::FrameStreamingCallbackPtr depthFrameCallback; // Depth streaming callback registered with RawKinectViewer application
 	Kinect::CornerExtractor* cornerExtractor; // Helper object to extract grid corners from color frames
 	Kinect::DiskExtractor* diskExtractor; // Helper object to extract disks from depth frames
 	Threads::TripleBuffer<CornerList> cornerBuffer; // Triple buffer of corner extraction results

@@ -1,7 +1,7 @@
 /***********************************************************************
 Camera - Wrapper class to represent the color and depth camera interface
 aspects of the Kinect sensor.
-Copyright (c) 2010-2024 Oliver Kreylos
+Copyright (c) 2010-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -76,6 +76,11 @@ class Camera:public DirectFrameSource
 		/* Elements: */
 		public:
 		
+		/*********************************************************************
+		For whatever reason, the calibration parameters are queried in four
+		subsections at the USB interface. We'll have to deal with that.
+		*********************************************************************/
+		
 		/* First parameter subsection: registration parameters */
 		Misc::SInt32 dxCenter;
 		Misc::SInt32 ax,bx,cx,dx;
@@ -107,66 +112,15 @@ class Camera:public DirectFrameSource
 		Misc::Float32 referencePixelSize;
 		
 		/* Methods: */
-		void read(int subsection,IO::File& file); // Reads calibration parameter subsection from file
+		void read(int subsection,IO::File& file); // Reads the given calibration parameter subsection from file
 		void read(IO::File& file); // Reads all calibration parameters from file
 		void write(IO::File& file) const; // Writes all calibration parameters to file
 		};
 	
-	struct CameraParameters // Structure containing the imaging parameters of the color camera
-		{
-		/* Elements: */
-		public:
-		unsigned short exposure; // Camera exposure time, 654==33ms, 0==500ms
-		unsigned short sharpening; // Bits 0-2 are sharpening factor from 0% to 200%; bit 3 enables automatic sharpening reduction
-		unsigned short operatingMode; // Bit field defining the camera's operating mode
-		};
-	
 	private:
+	struct CameraParameters; // Structure containing the imaging parameters of the color camera
 	typedef Misc::UInt16 USBWord; // Type for words of data exchanged at the USB library API
-	
-	struct StreamingState // Structure containing necessary state to stream color or depth frames from the respective camera
-		{
-		/* Elements: */
-		public:
-		Camera* camera; // Pointer to camera object owning this streaming state
-		unsigned int packetFlagBase; // Base value for stream's packet header flags
-		int packetSize; // Size of isochronous packets in bytes
-		int numPackets; // Number of packets per transfer
-		int numTransfers; // Size of transfer ring buffer to handle delays or transfer bursts
-		unsigned char** transferBuffers; // Array of transfer buffers
-		libusb_transfer** transfers; // Array of transfer structures
-		volatile int numActiveTransfers; // Number of currently active transfers to properly handle cancellation
-		
-		Size frameSize; // Size of streamed frames in pixels
-		size_t rawFrameSize; // Total size of encoded frames received from the camera
-		unsigned char* rawFrameBuffer; // Double buffer to assemble an encoded frame during streaming and hold a previous frame for processing
-		int activeBuffer; // Index of buffer half currently receiving frame data from the camera
-		double activeFrameTimeStamp; // Time stamp for the frame currently being received
-		unsigned char* writePtr; // Current write position in active buffer half
-		size_t bufferSpace; // Number of bytes still to be written into active buffer half
-		
-		Threads::MutexCond frameReadyCond; // Condition variable to signal completion of a new frame to the decoding thread
-		bool readyFrameIntact; // Flag whether the completed frame was received intact
-		unsigned char* volatile readyFrame; // Pointer to buffer half containing the completed frame
-		double readyFrameTimeStamp; // Time stamp of completed frame
-		volatile bool cancelDecoding; // Flag to cancel the deocding thread
-		Threads::Thread decodingThread; // Thread to decode raw frames into user-visible format
-		
-		StreamingCallback* streamingCallback; // Callback to be called when a new frame has been decoded
-		
-		#if KINECT_CAMERA_DUMP_HEADERS
-		IO::FilePtr headerFile;
-		#endif
-		
-		/* Constructors and destructors: */
-		public:
-		StreamingState(libusb_device_handle* handle,unsigned int endpoint,Camera* sCamera,int sPacketFlagBase,int sPacketSize,const Size& sFrameSize,size_t sRawFrameSize,StreamingCallback* sStreamingCallback); // Prepares a streaming state for streaming
-		~StreamingState(void); // Cleanly stops streaming and destroys the streaming state
-		
-		/* Methods: */
-		static void transferCallback(libusb_transfer* transfer); // Callback called when a USB transfer completes or is cancelled
-		};
-	
+	struct StreamingState; // Structure containing necessary state to stream color or depth frames from the respective camera
 	friend class StreamingState;
 	
 	/* Elements: */
@@ -200,6 +154,7 @@ class Camera:public DirectFrameSource
 	void* depthDecodingThreadMethod(void); // The depth decoding thread method
 	void* compressedDepthDecodingThreadMethod(void); // The depth decoding thread method for RLE/differential-compressed frames
 	void initialize(USB::DeviceList* deviceList =0); // Initializes the Kinect camera; called from constructors
+	void resetCameras(void); // Resets the cameras to non-streaming mode after streaming is stopped
 	void nearModeToggleCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData); // Called when user toggles "near mode" button
 	void irIntensitySliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData); // Called when user moves IR intensity slider
 	void colorExposureSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData); // Called when user moves color exposure slider
@@ -218,7 +173,7 @@ class Camera:public DirectFrameSource
 	virtual IntrinsicParameters getIntrinsicParameters(void);
 	virtual const Size& getActualFrameSize(int sensor) const;
 	virtual DepthRange getDepthRange(void) const;
-	virtual void startStreaming(StreamingCallback* newColorStreamingCallback,StreamingCallback* newDepthStreamingCallback);
+	virtual void startStreaming(void);
 	virtual void stopStreaming(void);
 	
 	/* Methods from class DirectFrameSource: */

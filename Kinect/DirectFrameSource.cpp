@@ -1,7 +1,7 @@
 /***********************************************************************
 DirectFrameSource - Intermediate class for frame sources that are
 directly connected to a camera device.
-Copyright (c) 2015-2024 Oliver Kreylos
+Copyright (c) 2015-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -26,9 +26,9 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Misc/SelfDestructArray.h>
 #include <Misc/StdError.h>
 #include <Misc/MessageLogger.h>
-#include <Misc/FunctionCalls.h>
 #include <Misc/StandardValueCoders.h>
 #include <Misc/ConfigurationFile.h>
+#include <Threads/FunctionCalls.h>
 #include <IO/File.h>
 #include <IO/Directory.h>
 #include <Math/Math.h>
@@ -58,7 +58,9 @@ Methods of class DirectFrameSource:
 
 void DirectFrameSource::processDepthFrameBackground(FrameBuffer& depthFrame)
 	{
+	{
 	/* Check if a background capture is currently active: */
+	Threads::Mutex::Lock backgroundCaptureLock(backgroundCaptureMutex);
 	if(backgroundCaptureNumFrames>0)
 		{
 		/* Update the background frame's depth values: */
@@ -118,15 +120,13 @@ void DirectFrameSource::processDepthFrameBackground(FrameBuffer& depthFrame)
 			/* Check if there is a callback to be called: */
 			if(backgroundCaptureCallback!=0)
 				{
-				/* Call the callback: */
+				/* Call the callback and immediately release it: */
 				(*backgroundCaptureCallback)(*this);
-				
-				/* Remove the callback object: */
-				delete backgroundCaptureCallback;
 				backgroundCaptureCallback=0;
 				}
 			}
 		}
+	}
 	
 	/* Check if we're removing background: */
 	if(removeBackground)
@@ -152,23 +152,37 @@ void DirectFrameSource::removeBackgroundToggleCallback(GLMotif::ToggleButton::Va
 
 void DirectFrameSource::captureBackgroundCompleteCallback(DirectFrameSource& source,GLMotif::Button* button)
 	{
-	/* Re-enable the button: */
+	/* Re-enable the "capture background" button: */
 	button->setEnabled(true);
 	}
 
 void DirectFrameSource::captureBackgroundButtonCallback(GLMotif::Button::SelectCallbackData* cbData)
 	{
-	/* Disable the "capture background" button until the capture is complete: */
-	cbData->button->setEnabled(false);
-	
-	/* Start a background capture: */
-	captureBackground(150,false,Misc::createFunctionCall(this,&DirectFrameSource::captureBackgroundCompleteCallback,cbData->button));
+	try
+		{
+		/* Request a background capture for five seconds, assuming the depth frame source delivers 30 frames/second: */
+		captureBackground(150,*Threads::createFunctionCall(this,&DirectFrameSource::captureBackgroundCompleteCallback,cbData->button),false);
+		
+		/* Disable the "capture background" button until the capture is complete: */
+		cbData->button->setEnabled(false);
+		}
+	catch(const std::runtime_error&)
+		{
+		/* Ignore the error and carry on: */
+		}
 	}
 
 void DirectFrameSource::backgroundMaxDepthCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
 	{
-	/* Create a new background image at the given depth: */
-	setMaxDepth(int(Math::floor(cbData->value+0.5)),true);
+	try
+		{
+		/* Create a new background image at the given depth: */
+		setMaxDepth(int(Math::floor(cbData->value+0.5)),true);
+		}
+	catch(const std::runtime_error&)
+		{
+		/* Ignore the error and carry on: */
+		}
 	}
 
 void DirectFrameSource::backgroundRemovalFuzzCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
@@ -188,7 +202,7 @@ void DirectFrameSource::loadBackgroundCallback(GLMotif::FileSelectionDialog::OKC
 	catch(const std::runtime_error& err)
 		{
 		/* Show an error message: */
-		Misc::formattedUserError("Load...: Could not load background from file %s due to exception %s",cbData->selectedFileName,err.what());
+		Misc::formattedUserError("Load...: Cannot load background from file %s due to exception %s",cbData->selectedFileName,err.what());
 		}
 	}
 
@@ -203,13 +217,13 @@ void DirectFrameSource::saveBackgroundCallback(GLMotif::FileSelectionDialog::OKC
 	catch(const std::runtime_error& err)
 		{
 		/* Show an error message: */
-		Misc::formattedUserError("Save...: Could not save background to file %s due to exception %s",cbData->selectedFileName,err.what());
+		Misc::formattedUserError("Save...: Cannot save background to file %s due to exception %s",cbData->selectedFileName,err.what());
 		}
 	}
 
 DirectFrameSource::DirectFrameSource(void)
 	:backgroundFrame(0),
-	 backgroundCaptureNumFrames(0),backgroundCaptureCallback(0),
+	 backgroundCaptureNumFrames(0),
 	 removeBackground(false),backgroundRemovalFuzz(3)
 	{
 	}
@@ -246,7 +260,7 @@ FrameSource::ExtrinsicParameters DirectFrameSource::getExtrinsicParameters(void)
 		catch(const std::runtime_error& err)
 			{
 			/* Log an error and return a default set of extrinsic parameters: */
-			Misc::formattedConsoleError("Kinect::DirectFrameSource::getExtrinsicParameters: Could not load extrinsic parameter file %s due to exception %s",extrinsicParameterFileName.c_str(),err.what());
+			Misc::formattedConsoleError("Kinect::DirectFrameSource::getExtrinsicParameters: Cannot load extrinsic parameter file %s due to exception %s",extrinsicParameterFileName.c_str(),err.what());
 			
 			return ExtrinsicParameters::identity;
 			}
@@ -256,6 +270,20 @@ FrameSource::ExtrinsicParameters DirectFrameSource::getExtrinsicParameters(void)
 		/* Return a default set of extrinsic parameters: */
 		return ExtrinsicParameters::identity;
 		}
+	}
+
+void DirectFrameSource::stopStreaming(void)
+	{
+	/* Release a potential background frame buffer: */
+	backgroundFrameSize=0;
+	delete[] backgroundFrame;
+	backgroundFrame=0;
+	
+	/* Turn off background removal: */
+	removeBackground=false;
+	
+	/* Call the base class method: */
+	FrameSource::stopStreaming();
 	}
 
 void DirectFrameSource::configure(Misc::ConfigurationFileSection& configFileSection)
@@ -366,17 +394,22 @@ void DirectFrameSource::buildSettingsDialog(GLMotif::RowColumn* settingsDialog)
 	sliderBox->manageChild();
 	}
 
-void DirectFrameSource::captureBackground(unsigned int numFrames,bool replace,DirectFrameSource::BackgroundCaptureCallback* newBackgroundCaptureCallback)
+void DirectFrameSource::captureBackground(unsigned int numFrames,bool replace)
 	{
-	/* Remember the background capture callback: */
-	delete backgroundCaptureCallback;
-	backgroundCaptureCallback=newBackgroundCaptureCallback;
+	/* Check that there is no active background capture: */
+	{
+	Threads::Mutex::Lock backgroundCaptureLock(backgroundCaptureMutex);
+	if(backgroundCaptureNumFrames>0)
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Background capture in progress");
 	
 	/* Initialize the background frame buffer: */
-	const Size& depthFrameSize=getActualFrameSize(DEPTH);
-	if(backgroundFrame==0)
+	size_t depthFrameSize=getActualFrameSize(DEPTH).volume();
+	if(backgroundFrame==0||backgroundFrameSize!=depthFrameSize)
 		{
-		backgroundFrame=new DepthPixel[depthFrameSize.volume()];
+		/* Re-allocate the background frame: */
+		delete[] backgroundFrame;
+		backgroundFrameSize=depthFrameSize;
+		backgroundFrame=new DepthPixel[backgroundFrameSize];
 		replace=true;
 		}
 	
@@ -384,13 +417,51 @@ void DirectFrameSource::captureBackground(unsigned int numFrames,bool replace,Di
 		{
 		/* Initialize the background frame to "empty:" */
 		DepthPixel* bfPtr=backgroundFrame;
-		DepthPixel* bfEnd=bfPtr+depthFrameSize.volume();
+		DepthPixel* bfEnd=bfPtr+backgroundFrameSize;
 		for(;bfPtr!=bfEnd;++bfPtr)
 			*bfPtr=invalidDepth;
 		}
 	
 	/* Start capturing background frames: */
 	backgroundCaptureNumFrames=numFrames;
+	}
+	}
+
+void DirectFrameSource::captureBackground(unsigned int numFrames,DirectFrameSource::BackgroundCaptureCallback& newBackgroundCaptureCallback,bool replace)
+	{
+	/* Temporarily hold the given background capture callback: */
+	BackgroundCaptureCallbackPtr temp=&newBackgroundCaptureCallback;
+	
+	/* Check that there is no active background capture: */
+	{
+	Threads::Mutex::Lock backgroundCaptureLock(backgroundCaptureMutex);
+	if(backgroundCaptureNumFrames>0)
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Background capture in progress");
+	
+	/* Initialize the background frame buffer: */
+	size_t depthFrameSize=getActualFrameSize(DEPTH).volume();
+	if(backgroundFrame==0||backgroundFrameSize!=depthFrameSize)
+		{
+		/* Re-allocate the background frame: */
+		delete[] backgroundFrame;
+		backgroundFrameSize=depthFrameSize;
+		backgroundFrame=new DepthPixel[backgroundFrameSize];
+		replace=true;
+		}
+	
+	if(replace)
+		{
+		/* Initialize the background frame to "empty:" */
+		DepthPixel* bfPtr=backgroundFrame;
+		DepthPixel* bfEnd=bfPtr+backgroundFrameSize;
+		for(;bfPtr!=bfEnd;++bfPtr)
+			*bfPtr=invalidDepth;
+		}
+	
+	/* Start capturing background frames: */
+	backgroundCaptureCallback=std::move(temp);
+	backgroundCaptureNumFrames=numFrames;
+	}
 	}
 
 bool DirectFrameSource::loadDefaultBackground(void)
@@ -418,7 +489,7 @@ bool DirectFrameSource::loadDefaultBackground(void)
 		catch(const std::runtime_error& err)
 			{
 			/* Log an error: */
-			Misc::formattedConsoleError("Kinect::DirectFrameSource: Could not load default background file %s due to exception %s",backgroundFileName.c_str(),err.what());
+			Misc::formattedConsoleError("Kinect::DirectFrameSource: Cannot load default background file %s due to exception %s",backgroundFileName.c_str(),err.what());
 			
 			return false;
 			}
@@ -443,6 +514,12 @@ void DirectFrameSource::loadBackground(const char* fileNamePrefix)
 
 void DirectFrameSource::loadBackground(IO::File& file)
 	{
+	/* Check that there is no active background capture: */
+	{
+	Threads::Mutex::Lock backgroundCaptureLock(backgroundCaptureMutex);
+	if(backgroundCaptureNumFrames>0)
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Background capture in progress");
+	
 	/* Read the frame header: */
 	Size fileFrameSize;
 	for(int i=0;i<2;++i)
@@ -454,52 +531,68 @@ void DirectFrameSource::loadBackground(IO::File& file)
 		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Background frame size mismatch");
 	
 	/* Create a temporary background frame buffer: */
-	Misc::SelfDestructArray<DepthPixel> newBackgroundFrame(depthFrameSize.volume());
+	size_t newBackgroundFrameSize=depthFrameSize.volume();
+	Misc::SelfDestructArray<DepthPixel> newBackgroundFrame(newBackgroundFrameSize);
 	
 	/* Read the background file: */
-	file.read(newBackgroundFrame.getArray(),depthFrameSize.volume());
+	file.read(newBackgroundFrame.getArray(),newBackgroundFrameSize);
 	
 	/* Install the new background frame: */
 	delete[] backgroundFrame;
+	backgroundFrameSize=newBackgroundFrameSize;
 	backgroundFrame=newBackgroundFrame.releaseTarget();
+	}
 	}
 
 void DirectFrameSource::setMaxDepth(unsigned int newMaxDepth,bool replace)
 	{
+	/* Check that there is no active background capture: */
+	{
+	Threads::Mutex::Lock backgroundCaptureLock(backgroundCaptureMutex);
+	if(backgroundCaptureNumFrames>0)
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Background capture in progress");
+	
 	/* Limit the depth value to the valid range: */
 	if(newMaxDepth>invalidDepth)
 		newMaxDepth=invalidDepth;
 	DepthPixel nmd=DepthPixel(newMaxDepth);
 	
-	const Size& depthFrameSize=getActualFrameSize(DEPTH);
-	if(backgroundFrame==0)
+	size_t depthFrameSize=getActualFrameSize(DEPTH).volume();
+	if(backgroundFrame==0||backgroundFrameSize!=depthFrameSize)
 		{
 		/* Create the background frame buffer: */
-		backgroundFrame=new DepthPixel[depthFrameSize.volume()];
+		backgroundFrameSize=depthFrameSize;
+		backgroundFrame=new DepthPixel[backgroundFrameSize];
 		replace=true;
 		}
 	
+	/* Replace or update the background frame: */
+	DepthPixel* bfPtr=backgroundFrame;
+	DepthPixel* bfEnd=bfPtr+backgroundFrameSize;
 	if(replace)
 		{
 		/* Initialize the background frame to the max depth value */
-		DepthPixel* bfPtr=backgroundFrame;
-		DepthPixel* bfEnd=bfPtr+depthFrameSize.volume();
 		for(;bfPtr!=bfEnd;++bfPtr)
 			*bfPtr=nmd;
 		}
 	else
 		{
 		/* Modify the existing background frame buffer: */
-		DepthPixel* bfPtr=backgroundFrame;
-		DepthPixel* bfEnd=bfPtr+depthFrameSize.volume();
 		for(;bfPtr!=bfEnd;++bfPtr)
 			if(*bfPtr>nmd)
 				*bfPtr=nmd;
 		}
 	}
+	}
 
 void DirectFrameSource::saveBackground(const char* fileNamePrefix)
 	{
+	/* Check that there is no active background capture: */
+	{
+	Threads::Mutex::Lock backgroundCaptureLock(backgroundCaptureMutex);
+	if(backgroundCaptureNumFrames>0)
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Background capture in progress");
+	
 	/* Bail out if there is no background frame: */
 	if(backgroundFrame==0)
 		return;
@@ -515,9 +608,16 @@ void DirectFrameSource::saveBackground(const char* fileNamePrefix)
 	backgroundFile->setEndianness(Misc::LittleEndian);
 	saveBackground(*backgroundFile);
 	}
+	}
 
 void DirectFrameSource::saveBackground(IO::File& file)
 	{
+	/* Check that there is no active background capture: */
+	{
+	Threads::Mutex::Lock backgroundCaptureLock(backgroundCaptureMutex);
+	if(backgroundCaptureNumFrames>0)
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Background capture in progress");
+	
 	/* Bail out if there is no background frame: */
 	if(backgroundFrame==0)
 		return;
@@ -525,6 +625,7 @@ void DirectFrameSource::saveBackground(IO::File& file)
 	const Size& depthFrameSize=getActualFrameSize(DEPTH);
 	file.write<Misc::UInt32,unsigned int>(depthFrameSize.getComponents(),2);
 	file.write(backgroundFrame,depthFrameSize.volume());
+	}
 	}
 
 void DirectFrameSource::setRemoveBackground(bool newRemoveBackground)

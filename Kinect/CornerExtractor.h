@@ -1,7 +1,7 @@
 /***********************************************************************
 CornerExtractor - Helper class to extract the 2D center points of grid
 corners from color images.
-Copyright (c) 2015-2022 Oliver Kreylos
+Copyright (c) 2015-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -25,6 +25,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #define KINECT_CORNEREXTRACTOR_INCLUDED
 
 #include <vector>
+#include <Misc/Autopointer.h>
 #include <Threads/Thread.h>
 #include <Threads/MutexCond.h>
 #include <Geometry/Point.h>
@@ -34,7 +35,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Kinect/FrameSource.h>
 
 /* Forward declarations: */
-namespace Misc {
+namespace Threads {
 template <class ParameterParam>
 class FunctionCall;
 }
@@ -58,7 +59,7 @@ class CornerExtractor
 		};
 	
 	typedef std::vector<Corner> CornerList; // Type for lists of extracted corners
-	typedef Misc::FunctionCall<const CornerList&> ExtractionResultCallback; // Type for functions to be called when corners have been extracted from a color image
+	typedef Threads::FunctionCall<const CornerList&> ExtractionResultCallback; // Type for functions to be called when corners have been extracted from a color image
 	
 	private:
 	struct RingPixel // Structure to store pixel offsets and angles around a ring
@@ -109,7 +110,7 @@ class CornerExtractor
 	unsigned char greyMin,greyMax; // Ditto
 	Scalar mbwi,ma,mbwrs; // Ditto
 	Threads::Thread cornerExtractorThread; // Background thread extracting corners from color images
-	ExtractionResultCallback* extractionResultCallback; // Function called with corner extraction results
+	Misc::Autopointer<ExtractionResultCallback> extractionResultCallback; // Function called with corner extraction results
 	
 	/* Private methods: */
 	void normalizeFrame(const FrameBuffer& frame); // Normalizes the given color frame with the given sliding window size
@@ -147,7 +148,7 @@ class CornerExtractor
 	void setMaxAsymmetry(Scalar newMaxAsymmetry);
 	void setMaxBlackWhiteRatioSlope(Scalar newMaxBlackWhiteRatioSlope);
 	CornerList processFrame(const FrameBuffer& frame); // Immediately processes the given frame
-	void startStreaming(ExtractionResultCallback* newExtractionResultCallback); // Starts background processing; class takes ownership of new-allocated function object
+	void startStreaming(ExtractionResultCallback& newExtractionResultCallback); // Starts background processing
 	void stopStreaming(void); // Stops background processing
 	void submitFrame(const FrameBuffer& newNewFrame) // Holds the given color frame for corner extraction
 		{
