@@ -1,6 +1,6 @@
 /***********************************************************************
 CameraRealSense - Class representing an Intel RealSense camera.
-Copyright (c) 2016-2024 Oliver Kreylos
+Copyright (c) 2016-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -86,7 +86,7 @@ void CameraRealSense::setColorStreamState(bool enable)
 		if(error!=0)
 			{
 			/* Throw an exception: */
-			std::runtime_error exception(Misc::makeStdErrMsg(__PRETTY_FUNCTION__,"Error %s while setting stream state",rs_get_error_message(error)));
+			std::runtime_error exception=Misc::makeStdErr(__PRETTY_FUNCTION__,"Error %s while setting stream state",rs_get_error_message(error));
 			rs_free_error(error);
 			throw exception;
 			}
@@ -116,7 +116,7 @@ void CameraRealSense::setDepthStreamState(bool enable)
 		if(error!=0)
 			{
 			/* Throw an exception: */
-			std::runtime_error exception(Misc::makeStdErrMsg(__PRETTY_FUNCTION__,"Error %s while setting stream state",rs_get_error_message(error)));
+			std::runtime_error exception=Misc::makeStdErr(__PRETTY_FUNCTION__,"Error %s while setting stream state",rs_get_error_message(error));
 			rs_free_error(error);
 			throw exception;
 			}
@@ -133,7 +133,7 @@ void handleStreamingError(rs_error* error)
 	if(error!=0)
 		{
 		/* Throw an exception: */
-		std::runtime_error exception(Misc::makeStdErrMsg(__PRETTY_FUNCTION__,"Error %s while receiving frame",rs_get_error_message(error)));
+		std::runtime_error exception=Misc::makeStdErr(__PRETTY_FUNCTION__,"Error %s while receiving frame",rs_get_error_message(error));
 		rs_free_error(error);
 		throw exception;
 		}
@@ -223,7 +223,7 @@ void* CameraRealSense::streamingThreadMethod(void)
 		}
 	catch(const std::runtime_error& err)
 		{
-		Misc::formattedUserError("Kinect::CameraRealSense::streamingThreadMethod: Terminating streaming thread due to exception %s",err.what());
+		Misc::sourcedUserError(__PRETTY_FUNCTION__,"Terminating streaming thread due to exception %s",err.what());
 		}
 	
 	return 0;
@@ -291,7 +291,7 @@ CameraRealSense::CameraRealSense(size_t index)
 	/* Check if there are enough connected RealSense cameras: */
 	size_t numDevices=size_t(context->getNumDevices());
 	if(index>=numDevices)
-		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Cannot open RealSense camera with index %u; only %u RealSense devices present",(unsigned int)index,(unsigned int)numDevices);
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Fewer than %u RealSense cameras connected to host",(unsigned int)(index));
 	
 	/* Open the camera device: */
 	device=context->getDevice(int(index));
@@ -324,7 +324,7 @@ CameraRealSense::CameraRealSense(const char* serialNumber)
 			}
 		}
 	if(device==0)
-		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"No RealSense camera with serial number %s present",serialNumber);
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"RealSense camera with serial number %s not found",serialNumber);
 	
 	/* Initialize the camera: */
 	initialize();
@@ -365,7 +365,7 @@ FrameSource::IntrinsicParameters CameraRealSense::getIntrinsicParameters(void)
 	if(error!=0)
 		{
 		/* Throw an exception: */
-		std::runtime_error exception(Misc::makeStdErrMsg(__PRETTY_FUNCTION__,"Error %s while querying camera intrinsics",rs_get_error_message(error)));
+		std::runtime_error exception=Misc::makeStdErr(__PRETTY_FUNCTION__,"Error %s while querying camera intrinsics",rs_get_error_message(error));
 		rs_free_error(error);
 		throw exception;
 		}
@@ -423,65 +423,47 @@ const Size& CameraRealSense::getActualFrameSize(int sensor) const
 	return frameSizes[sensor];
 	}
 
-void CameraRealSense::startStreaming(FrameSource::StreamingCallback* newColorStreamingCallback,FrameSource::StreamingCallback* newDepthStreamingCallback)
+void CameraRealSense::startStreaming(void)
 	{
 	/* Throw an exception if already streaming: */
 	if(runStreamingThread)
 		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"RealSense device is already streaming");
 	
-	/* Remember the provided callback functions: */
-	colorStreamingCallback=newColorStreamingCallback;
-	depthStreamingCallback=newDepthStreamingCallback;
+	/* Enable the requested camera streams: */
+	setColorStreamState(colorStreamingCallback!=0);
+	setDepthStreamState(depthStreamingCallback!=0);
 	
-	try
+	/* Start streaming: */
+	rs_error* error=0;
+	rs_start_device(device,&error);
+	if(error!=0)
 		{
-		/* Enable the requested camera streams: */
-		setColorStreamState(colorStreamingCallback!=0);
-		setDepthStreamState(depthStreamingCallback!=0);
-		
-		/* Start streaming: */
-		rs_error* error=0;
-		rs_start_device(device,&error);
-		if(error!=0)
-			{
-			/* Throw an exception: */
-			std::runtime_error exception(Misc::makeStdErrMsg(__PRETTY_FUNCTION__,"Error %s while starting device",rs_get_error_message(error)));
-			rs_free_error(error);
-			throw exception;
-			}
-		
-		/* Start the background streaming thread: */
-		runStreamingThread=true;
-		streamingThread.start(this,&CameraRealSense::streamingThreadMethod);
+		/* Throw an exception: */
+		std::runtime_error exception=Misc::makeStdErr(__PRETTY_FUNCTION__,"Error %s while starting device",rs_get_error_message(error));
+		rs_free_error(error);
+		throw exception;
 		}
-	catch(...)
-		{
-		/* Clean up: */
-		delete colorStreamingCallback;
-		colorStreamingCallback=0;
-		delete depthStreamingCallback;
-		depthStreamingCallback=0;
-		
-		/* Re-throw the exception: */
-		throw;
-		}
+	
+	/* Start the background streaming thread: */
+	runStreamingThread=true;
+	streamingThread.start(this,&CameraRealSense::streamingThreadMethod);
+	
+	/* Call the base class method: */
+	DirectFrameSource::startStreaming();
 	}
 
 void CameraRealSense::stopStreaming(void)
 	{
 	/* Bail out if not actually streaming: */
-	if(!runStreamingThread)
+	if(!streaming)
 		return;
+	
+	/* Call the base class method: */
+	DirectFrameSource::stopStreaming();
 	
 	/* Stop the background streaming thread: */
 	runStreamingThread=false;
 	streamingThread.join();
-	
-	/* Delete the callback functions: */
-	delete colorStreamingCallback;
-	colorStreamingCallback=0;
-	delete depthStreamingCallback;
-	depthStreamingCallback=0;
 	
 	/* Stop streaming: */
 	rs_error* error=0;
@@ -489,7 +471,7 @@ void CameraRealSense::stopStreaming(void)
 	if(error!=0)
 		{
 		/* Throw an exception: */
-		std::runtime_error exception(Misc::makeStdErrMsg(__PRETTY_FUNCTION__,"Error %s while stopping device",rs_get_error_message(error)));
+		std::runtime_error exception=Misc::makeStdErr(__PRETTY_FUNCTION__,"Error %s while stopping device",rs_get_error_message(error));
 		rs_free_error(error);
 		throw exception;
 		}
@@ -504,7 +486,7 @@ std::string CameraRealSense::getSerialNumber(void)
 	if(error!=0)
 		{
 		/* Throw an exception: */
-		std::runtime_error exception(Misc::makeStdErrMsg(__PRETTY_FUNCTION__,"Error %s while querying device's serial number",rs_get_error_message(error)));
+		std::runtime_error exception=Misc::makeStdErr(__PRETTY_FUNCTION__,"Error %s while querying device's serial number",rs_get_error_message(error));
 		rs_free_error(error);
 		throw exception;
 		}

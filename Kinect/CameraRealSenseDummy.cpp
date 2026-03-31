@@ -1,7 +1,7 @@
 /***********************************************************************
 CameraRealSenseDummy - Class to dummy out support for Intel RealSense
 cameras.
-Copyright (c) 2017-2022 Oliver Kreylos
+Copyright (c) 2017-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -24,8 +24,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Kinect/CameraRealSense.h>
 
 #include <string>
-#include <stdexcept>
-#include <Misc/FunctionCalls.h>
+#include <Misc/StdError.h>
 
 namespace Kinect {
 
@@ -95,12 +94,12 @@ size_t CameraRealSense::getNumDevices(void)
 
 CameraRealSense::CameraRealSense(size_t index)
 	{
-	throw std::runtime_error("Kinect::CameraRealSense: Intel RealSense cameras not supported by Kinect library");
+	throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Intel RealSense cameras not supported by Kinect library");
 	}
 
 CameraRealSense::CameraRealSense(const char* serialNumber)
 	{
-	throw std::runtime_error("Kinect::CameraRealSense: Intel RealSense cameras not supported by Kinect library");
+	throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Intel RealSense cameras not supported by Kinect library");
 	}
 
 CameraRealSense::~CameraRealSense(void)
@@ -122,10 +121,8 @@ const Size& CameraRealSense::getActualFrameSize(int sensor) const
 	return frameSizes[sensor];
 	}
 
-void CameraRealSense::startStreaming(FrameSource::StreamingCallback* newColorStreamingCallback,FrameSource::StreamingCallback* newDepthStreamingCallback)
+void CameraRealSense::startStreaming(void)
 	{
-	delete newColorStreamingCallback;
-	delete newDepthStreamingCallback;
 	}
 
 void CameraRealSense::stopStreaming(void)

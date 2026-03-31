@@ -1,6 +1,6 @@
 /***********************************************************************
 CameraV2Dummy - Class to dummy out support forKinect v2 cameras.
-Copyright (c) 2017-2022 Oliver Kreylos
+Copyright (c) 2017-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -23,8 +23,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Kinect/CameraV2.h>
 
 #include <string>
-#include <stdexcept>
-#include <Misc/FunctionCalls.h>
+#include <Misc/StdError.h>
 
 namespace Kinect {
 
@@ -44,17 +43,17 @@ size_t CameraV2::getNumDevices(void)
 
 CameraV2::CameraV2(libusb_device* sDevice)
 	{
-	throw std::runtime_error("Kinect::CameraV2: Kinect V2 not supported by Kinect library");
+	throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Kinect V2 not supported by Kinect library");
 	}
 
 CameraV2::CameraV2(size_t index)
 	{
-	throw std::runtime_error("Kinect::CameraV2: Kinect V2 not supported by Kinect library");
+	throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Kinect V2 not supported by Kinect library");
 	}
 
 CameraV2::CameraV2(const char* serialNumber)
 	{
-	throw std::runtime_error("Kinect::CameraV2: Kinect V2 not supported by Kinect library");
+	throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Kinect V2 not supported by Kinect library");
 	}
 
 CameraV2::~CameraV2(void)
@@ -77,10 +76,8 @@ const Size& CameraV2::getActualFrameSize(int sensor) const
 	return frameSizes[sensor];
 	}
 
-void CameraV2::startStreaming(FrameSource::StreamingCallback* newColorStreamingCallback,FrameSource::StreamingCallback* newDepthStreamingCallback)
+void CameraV2::startStreaming()
 	{
-	delete newColorStreamingCallback;
-	delete newDepthStreamingCallback;
 	}
 
 void CameraV2::stopStreaming(void)
