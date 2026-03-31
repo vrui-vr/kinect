@@ -1,7 +1,7 @@
 /***********************************************************************
 CameraOrbbec - Class to represent the color and depth camera interface
 aspects of an Orbbec 3D camera supported by the Orbbec SDK.
-Copyright (c) 2025 Oliver Kreylos
+Copyright (c) 2025-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -24,6 +24,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Kinect/CameraOrbbec.h>
 
 #include <Misc/StdError.h>
+#include <Threads/FunctionCalls.h>
 #include <Kinect/Internal/OrbbecSDKContext.h>
 
 namespace Kinect {

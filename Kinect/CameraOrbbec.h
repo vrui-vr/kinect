@@ -1,7 +1,7 @@
 /***********************************************************************
 CameraOrbbec - Class to represent the color and depth camera interface
 aspects of an Orbbec 3D camera supported by the Orbbec SDK.
-Copyright (c) 2025 Oliver Kreylos
+Copyright (c) 2025-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -78,7 +78,7 @@ class CameraOrbbec:public DirectFrameSource
 	virtual DepthCorrection* getDepthCorrectionParameters(void);
 	virtual IntrinsicParameters getIntrinsicParameters(void);
 	virtual const Size& getActualFrameSize(int sensor) const;
-	virtual void startStreaming(StreamingCallback* newColorStreamingCallback,StreamingCallback* newDepthStreamingCallback);
+	virtual void startStreaming(void);
 	virtual void stopStreaming(void);
 	
 	/* Methods from class DirectFrameSource: */
