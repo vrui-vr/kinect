@@ -1,7 +1,7 @@
 /***********************************************************************
 CornerExtractor - Helper class to extract the 2D center points of grid
 corners from color images.
-Copyright (c) 2015-2022 Oliver Kreylos
+Copyright (c) 2015-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -23,7 +23,8 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 
 #include <Kinect/CornerExtractor.h>
 
-#include <Misc/FunctionCalls.h>
+#include <Misc/StdError.h>
+#include <Threads/FunctionCalls.h>
 #include <Math/Math.h>
 #include <Math/Constants.h>
 #include <Geometry/ValuedPoint.h>
@@ -588,8 +589,7 @@ CornerExtractor::CornerExtractor(const Size& sFrameSize,unsigned int sMaxNumRing
 	 numRings(maxNumRings),maxNonCornerRings(0),
 	 maxBlackWhiteImbalance(Scalar(0.4)),maxAsymmetry(Math::rad(Scalar(20))),
 	 maxBlackWhiteRatioSlope(Scalar(0.0125)),
-	 keepProcessing(false),
-	 extractionResultCallback(0)
+	 keepProcessing(false)
 	{
 	/* Initialize gamma correction table: */
 	setInputGamma(1.0f);
@@ -782,7 +782,6 @@ CornerExtractor::~CornerExtractor(void)
 	delete[] normalizedImage;
 	delete[] gridX;
 	delete[] gridY;
-	delete extractionResultCallback;
 	}
 
 void CornerExtractor::setUseGreenChannel(bool newUseGreenChannel)
@@ -876,17 +875,17 @@ CornerExtractor::CornerList CornerExtractor::processFrame(const FrameBuffer& fra
 	return extractionResult;
 	}
 
-void CornerExtractor::startStreaming(CornerExtractor::ExtractionResultCallback* newExtractionResultCallback)
+void CornerExtractor::startStreaming(CornerExtractor::ExtractionResultCallback& newExtractionResultCallback)
 	{
+	/* Temporarily hold the new callback: */
+	Misc::Autopointer<ExtractionResultCallback> temp(&newExtractionResultCallback);
+	
 	/* Bail out if already streaming: */
 	if(!cornerExtractorThread.isJoined())
-		{
-		delete newExtractionResultCallback;
-		throw std::runtime_error("CornerExtractor::startStreaming: Streaming already in progress");
-		}
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Streaming already in progress");
 	
 	/* Remember the result callback: */
-	extractionResultCallback=newExtractionResultCallback;
+	extractionResultCallback=std::move(temp);
 	
 	/* Start the disk extraction thread: */
 	keepProcessing=true;
@@ -912,7 +911,6 @@ void CornerExtractor::stopStreaming(void)
 	/* Wait until the corner extraction thread terminates: */
 	cornerExtractorThread.join();
 	
-	delete extractionResultCallback;
 	extractionResultCallback=0;
 	}
 

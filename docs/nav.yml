@@ -1,0 +1,9 @@
+Kinect:
+  # - Kinect Overview: index.md
+  - Getting started:
+    - installation/index.md
+    - Installation guide: installation/guide.md
+  - Usage:
+    - usage/index.md
+    - Recording 3D Movies: usage/recording_3d_movies.md
+    - Merging 3D Facades from Multiple Kinects: usage/merging_3d_facades.md

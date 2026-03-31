@@ -1,7 +1,7 @@
 /***********************************************************************
 KinectViewer - Simple application to view 3D reconstructions of color
 and depth images captured from a Kinect device.
-Copyright (c) 2010-2025 Oliver Kreylos
+Copyright (c) 2010-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -27,9 +27,9 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <string>
 #include <vector>
 #include <stdexcept>
-#include <Misc/FunctionCalls.h>
 #include <Misc/StandardValueCoders.h>
 #include <Misc/MessageLogger.h>
+#include <Threads/FunctionCalls.h>
 #include <IO/Directory.h>
 #include <IO/OpenFile.h>
 #include <Comm/OpenPipe.h>
@@ -381,13 +381,14 @@ void KinectViewer::KinectStreamer::startStreaming(const Kinect::FrameSource::Tim
 	#if !KINECT_CONFIG_USE_SHADERPROJECTOR
 	
 	/* Hook this streamer into the projector's mesh callback: */
-	projector->startStreaming(Misc::createFunctionCall(this,&KinectViewer::KinectStreamer::meshStreamingCallback));
+	projector->startStreaming(*Threads::createFunctionCall(this,&KinectViewer::KinectStreamer::meshStreamingCallback));
 	
 	#endif
 	
 	/* Hook this streamer into the frame source and start streaming: */
 	source->setTimeBase(timeBase);
-	source->startStreaming(Misc::createFunctionCall(this,&KinectViewer::KinectStreamer::colorStreamingCallback),Misc::createFunctionCall(this,&KinectViewer::KinectStreamer::depthStreamingCallback));
+	source->setStreamingCallbacks(*Threads::createFunctionCall(this,&KinectViewer::KinectStreamer::colorStreamingCallback),*Threads::createFunctionCall(this,&KinectViewer::KinectStreamer::depthStreamingCallback));
+	source->startStreaming();
 	}
 
 void KinectViewer::KinectStreamer::stopStreaming(void)

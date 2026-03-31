@@ -1,0 +1,5 @@
+KinectViewer now has a built-in recorder for 3D movies from one or more Kinect devices. When running a live view (using one or more `-c <Kinect index>` and/or `-p <server host> <server port>` command line arguments), the live 3D streams can be saved to a set of files by selecting the "Save Streams" main menu entry.
+
+KinectViewer will ask for a file name prefix, and then save the depth and color streams of all enabled Kinect devices to files `<prefix>-<index>.depth` and `<prefix>-<index>.color`. It will also record synchronized audio from the default capture device (selectable from the sound control panel) and save it to `<prefix>.wav`.
+
+Previously recorded 3D movies can be played back by running KinectViewer with one or more `-f <file name prefix>-<index>` arguments, one per saved 3D stream, and an optional `-s <sound file name>` argument to play back synchronized audio.

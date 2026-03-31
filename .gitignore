@@ -7,3 +7,5 @@ lib/
 lib64/
 bin/
 Make.sh
+
+.vscode/

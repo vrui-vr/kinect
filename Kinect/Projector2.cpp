@@ -2,7 +2,7 @@
 Projector2 - Class to project a depth frame captured from a 3D camera
 back into calibrated 3D camera space, and texture-map it with a matching
 color frame, using a combination of shader and CPU work.
-Copyright (c) 2016-2025 Oliver Kreylos
+Copyright (c) 2016-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -28,7 +28,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 
 #include <string>
 #include <Misc/PrintInteger.h>
-#include <Misc/FunctionCalls.h>
+#include <Threads/FunctionCalls.h>
 #include <GL/gl.h>
 #include <GL/GLMaterialTemplates.h>
 #include <GL/GLMiscTemplates.h>
@@ -426,7 +426,7 @@ Projector2::Projector2(void)
 	:inDepthFrameVersion(0),
 	 filterDepthFrames(false),lowpassDepthFrames(false),filteredDepthFrame(0),spatialFilterBuffer(0),
 	 mapTexture(true),illuminate(false),renderingShaderSettingsVersion(1),
-	 meshVersion(0),streamingCallback(0),colorFrameVersion(0)
+	 meshVersion(0),colorFrameVersion(0)
 	{
 	}
 
@@ -436,7 +436,7 @@ Projector2::Projector2(FrameSource& frameSource)
 	 inDepthFrameVersion(0),
 	 filterDepthFrames(false),lowpassDepthFrames(false),filteredDepthFrame(0),spatialFilterBuffer(0),
 	 mapTexture(true),illuminate(false),renderingShaderSettingsVersion(1),
-	 meshVersion(0),streamingCallback(0),colorFrameVersion(0)
+	 meshVersion(0),colorFrameVersion(0)
 	{
 	/* Set the depth frame size again to update the quad case vertex offset table: */
 	setDepthFrameSize(depthSize);
@@ -942,11 +942,10 @@ void Projector2::processDepthFrame(const FrameBuffer& depthFrame,MeshBuffer& mes
 	meshBuffer.timeStamp=depthFrame.timeStamp;
 	}
 
-void Projector2::startStreaming(Projector2::StreamingCallback* newStreamingCallback)
+void Projector2::startStreaming(Projector2::StreamingCallback& newStreamingCallback)
 	{
-	/* Delete the old streaming callback and install the new one: */
-	delete streamingCallback;
-	streamingCallback=newStreamingCallback;
+	/* Install the new streaming callback: */
+	streamingCallback=&newStreamingCallback;
 	
 	/* Start the depth frame processing thread: */
 	depthFrameProcessingThread.start(this,&Projector2::depthFrameProcessingThreadMethod);
@@ -985,8 +984,7 @@ void Projector2::stopStreaming(void)
 		depthFrameProcessingThread.join();
 		}
 	
-	/* Delete the streaming callback: */
-	delete streamingCallback;
+	/* Release the streaming callback: */
 	streamingCallback=0;
 	}
 

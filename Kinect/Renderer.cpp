@@ -1,7 +1,7 @@
 /***********************************************************************
 Renderer - Helper class to receive a 3D video stream from a frame
 source, and render it into an OpenGL context using a projector.
-Copyright (c) 2012-2016 Oliver Kreylos
+Copyright (c) 2012-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -23,7 +23,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 
 #include <Kinect/Renderer.h>
 
-#include <Misc/FunctionCalls.h>
+#include <Threads/FunctionCalls.h>
 #include <Kinect/FunctionCalls.h>
 #include <Kinect/Camera.h>
 #include <Kinect/ProjectorHeader.h>
@@ -43,7 +43,7 @@ void Renderer::colorStreamingCallback(const FrameBuffer& frameBuffer)
 		
 		/* Notify interested parties: */
 		if(streamingCallback!=0)
-			(*streamingCallback)();
+			(*streamingCallback)(0);
 		}
 	}
 
@@ -58,7 +58,7 @@ void Renderer::depthStreamingCallback(const FrameBuffer& frameBuffer)
 		
 		/* Notify interested parties: */
 		if(streamingCallback!=0)
-			(*streamingCallback)();
+			(*streamingCallback)(0);
 		
 		#endif
 		}
@@ -72,7 +72,7 @@ void Renderer::meshStreamingCallback(const MeshBuffer& meshBuffer)
 		{
 		/* Notify interested parties: */
 		if(streamingCallback!=0)
-			(*streamingCallback)();
+			(*streamingCallback)(0);
 		}
 	}
 
@@ -81,7 +81,6 @@ void Renderer::meshStreamingCallback(const MeshBuffer& meshBuffer)
 Renderer::Renderer(FrameSource* sSource)
 	:source(sSource),
 	 projector(new ProjectorType(*source)),
-	 streamingCallback(0),
 	 enabled(true)
 	{
 	}
@@ -97,8 +96,6 @@ Renderer::~Renderer(void)
 	/* Destroy the projector and frame source: */
 	delete projector;
 	delete source;
-	
-	delete streamingCallback;
 	}
 
 void Renderer::setTimeBase(const FrameSource::Time& newTimeBase)
@@ -107,21 +104,21 @@ void Renderer::setTimeBase(const FrameSource::Time& newTimeBase)
 	source->setTimeBase(newTimeBase);
 	}
 
-void Renderer::startStreaming(StreamingCallback* newStreamingCallback)
+void Renderer::startStreaming(Renderer::StreamingCallback& newStreamingCallback)
 	{
-	/* Delete the old streaming callback and install the new one: */
-	delete streamingCallback;
-	streamingCallback=newStreamingCallback;
+	/* Install the new streaming callback: */
+	streamingCallback=&newStreamingCallback;
 	
 	#if !KINECT_CONFIG_USE_SHADERPROJECTOR
 	
 	/* Hook this renderer into the projector's mesh callback: */
-	projector->startStreaming(Misc::createFunctionCall(this,&Renderer::meshStreamingCallback));
+	projector->startStreaming(*Threads::createFunctionCall(this,&Renderer::meshStreamingCallback));
 	
 	#endif
 	
 	/* Hook this renderer into the frame source and start streaming: */
-	source->startStreaming(Misc::createFunctionCall(this,&Renderer::colorStreamingCallback),Misc::createFunctionCall(this,&Renderer::depthStreamingCallback));
+	source->setStreamingCallbacks(*Threads::createFunctionCall(this,&Renderer::colorStreamingCallback),*Threads::createFunctionCall(this,&Renderer::depthStreamingCallback));
+	source->startStreaming();
 	}
 
 void Renderer::frame(void)

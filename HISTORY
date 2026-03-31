@@ -354,7 +354,7 @@ Kinect-4.2:
   Kinect::Camera::sendMessage method which caused protocol errors when
   downloading camera calibration data.
 
-Kinect-4.3:
+Kinect-5.0:
 - Bumped Vrui version requirement to 13.0-001.
 - Adapted to Vrui's new project build system.
 - Several changes to Kinect::FrameSource::IntrinsicParameters class.
@@ -367,3 +367,19 @@ Kinect-4.3:
 - Removed Kinect::LensDistortion class and its source files.
 - Refactored classes Kinect::Projector, Kinect::Projector2, and
   Kinect::ShaderProjector to use common Kinect::ProjectorBase class.
+
+Kinect-5.1:
+- Bumped Vrui version requirement to 14.0-001.
+- Fixed dependency bug in makefile.
+
+Kinect-6.0:
+- Bumped Vrui version requirement to 15.0-001.
+- Use optional assignment to VRUI_MAKEDIR in makefile to allow override
+  from environment.
+- Adapt all code to new style of callback management in Vrui:
+  - Replace Misc::FunctionCall with Threads::FunctionCall.
+  - Pass function calls by reference instead of by pointer.
+  - API change in Kinect::FrameSource:
+    - Removed callback parameters from startStreaming method
+    - Added new setColorStreamingCallback, setDepthStreamingCallback,
+      and setStreamingCallbacks methods.

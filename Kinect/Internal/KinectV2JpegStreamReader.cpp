@@ -1,7 +1,7 @@
 /***********************************************************************
 KinectV2JpegStreamReader - Class to read JPEG-compressed RGB images
 asynchronously from a stream of USB transfer buffers.
-Copyright (c) 2014-2024 Oliver Kreylos
+Copyright (c) 2014-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -26,8 +26,8 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <libusb-1.0/libusb.h>
 #include <Misc/SizedTypes.h>
 #include <Misc/StdError.h>
-#include <Misc/FunctionCalls.h>
 #include <Misc/MessageLogger.h>
+#include <Threads/FunctionCalls.h>
 #include <Kinect/FrameBuffer.h>
 #include <Kinect/CameraV2.h>
 
@@ -277,20 +277,19 @@ void KinectV2JpegStreamReader::setForceRgb(bool newForceRgb)
 	forceRgb=newForceRgb;
 	}
 
-USB::TransferPool::UserTransferCallback*  KinectV2JpegStreamReader::startStreaming(USB::TransferPool* newTransferPool,KinectV2JpegStreamReader::ImageReadyCallback* newImageReadyCallback)
+USB::TransferPool::UserTransferCallback*  KinectV2JpegStreamReader::startStreaming(USB::TransferPool* newTransferPool,KinectV2JpegStreamReader::ImageReadyCallback& newImageReadyCallback)
 	{
 	/* Remember the source transfer pool: */
 	transferPool=newTransferPool;
 	
 	/* Install the callback function: */
-	delete imageReadyCallback;
-	imageReadyCallback=newImageReadyCallback;
+	imageReadyCallback=&newImageReadyCallback;
 	
 	/* Start the background decompression thread: */
 	decompressionThread.start(this,&KinectV2JpegStreamReader::decompressionThreadMethod);
 	
 	/* Create and return a transfer callback: */
-	return Misc::createFunctionCall(this,&KinectV2JpegStreamReader::postTransfer,newTransferPool);
+	return Threads::createFunctionCall(this,&KinectV2JpegStreamReader::postTransfer,newTransferPool);
 	}
 
 void KinectV2JpegStreamReader::stopStreaming(void)
@@ -304,8 +303,7 @@ void KinectV2JpegStreamReader::stopStreaming(void)
 		transferPool->release(inQueue.pop_front());
 	transferPool=0;
 	
-	/* Delete the callback function: */
-	delete imageReadyCallback;
+	/* Forget the callback function: */
 	imageReadyCallback=0;
 	}
 

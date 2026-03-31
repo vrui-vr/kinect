@@ -1,7 +1,7 @@
 /***********************************************************************
 RawKinectViewer - Simple application to view color and depth images
 captured from a Kinect device.
-Copyright (c) 2010-2024 Oliver Kreylos
+Copyright (c) 2010-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -28,7 +28,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <iostream>
 #include <Misc/SelfDestructPointer.h>
 #include <Misc/StringPrintf.h>
-#include <Misc/FunctionCalls.h>
+#include <Threads/FunctionCalls.h>
 #include <IO/File.h>
 #include <IO/Directory.h>
 #include <Geometry/Point.h>
@@ -255,41 +255,45 @@ RawKinectViewer::CPoint RawKinectViewer::getDepthImagePoint(const Vrui::Point& i
 		}
 	}
 
-void RawKinectViewer::registerColorCallback(RawKinectViewer::FrameStreamingCallback* newCallback)
+void RawKinectViewer::registerColorCallback(RawKinectViewer::FrameStreamingCallback& newCallback)
 	{
+	/* Add the new callback to the color callback list: */
 	Threads::Spinlock::Lock frameCallbacksLock(frameCallbacksMutex);
-	colorFrameCallbacks.push_back(newCallback);
+	colorFrameCallbacks.push_back(&newCallback);
 	}
 
-void RawKinectViewer::unregisterColorCallback(RawKinectViewer::FrameStreamingCallback* callback)
+void RawKinectViewer::unregisterColorCallback(RawKinectViewer::FrameStreamingCallback& callback)
 	{
 	Threads::Spinlock::Lock frameCallbacksLock(frameCallbacksMutex);
 	
 	/* Find the callback in the list: */
-	for(std::vector<FrameStreamingCallback*>::iterator cbIt=colorFrameCallbacks.begin();cbIt!=colorFrameCallbacks.end();++cbIt)
-		if(*cbIt==callback)
+	for(std::vector<FrameStreamingCallbackPtr>::iterator cbIt=colorFrameCallbacks.begin();cbIt!=colorFrameCallbacks.end();++cbIt)
+		if(*cbIt==&callback)
 			{
-			*cbIt=colorFrameCallbacks.back();
+			/* Remove the callback and bail out: */
+			*cbIt=std::move(colorFrameCallbacks.back());
 			colorFrameCallbacks.pop_back();
 			break;
 			}
 	}
 
-void RawKinectViewer::registerDepthCallback(RawKinectViewer::FrameStreamingCallback* newCallback)
+void RawKinectViewer::registerDepthCallback(RawKinectViewer::FrameStreamingCallback& newCallback)
 	{
+	/* Add the new callback to the depth callback list: */
 	Threads::Spinlock::Lock frameCallbacksLock(frameCallbacksMutex);
-	depthFrameCallbacks.push_back(newCallback);
+	depthFrameCallbacks.push_back(&newCallback);
 	}
 
-void RawKinectViewer::unregisterDepthCallback(RawKinectViewer::FrameStreamingCallback* callback)
+void RawKinectViewer::unregisterDepthCallback(RawKinectViewer::FrameStreamingCallback& callback)
 	{
 	Threads::Spinlock::Lock frameCallbacksLock(frameCallbacksMutex);
 	
 	/* Find the callback in the list: */
-	for(std::vector<FrameStreamingCallback*>::iterator cbIt=depthFrameCallbacks.begin();cbIt!=depthFrameCallbacks.end();++cbIt)
-		if(*cbIt==callback)
+	for(std::vector<FrameStreamingCallbackPtr>::iterator cbIt=depthFrameCallbacks.begin();cbIt!=depthFrameCallbacks.end();++cbIt)
+		if(*cbIt==&callback)
 			{
-			*cbIt=depthFrameCallbacks.back();
+			/* Remove the callback and bail out: */
+			*cbIt=std::move(depthFrameCallbacks.back());
 			depthFrameCallbacks.pop_back();
 			break;
 			}
@@ -396,7 +400,7 @@ void RawKinectViewer::colorStreamingCallback(const Kinect::FrameBuffer& frameBuf
 		/* Call all color streaming callbacks: */
 		{
 		Threads::Spinlock::Lock frameCallbacksLock(frameCallbacksMutex);
-		for(std::vector<FrameStreamingCallback*>::iterator cbIt=colorFrameCallbacks.begin();cbIt!=colorFrameCallbacks.end();++cbIt)
+		for(std::vector<FrameStreamingCallbackPtr>::iterator cbIt=colorFrameCallbacks.begin();cbIt!=colorFrameCallbacks.end();++cbIt)
 			(**cbIt)(frameBuffer);
 		}
 		
@@ -415,7 +419,7 @@ void RawKinectViewer::depthStreamingCallback(const Kinect::FrameBuffer& frameBuf
 		/* Call all depth streaming callbacks: */
 		{
 		Threads::Spinlock::Lock frameCallbacksLock(frameCallbacksMutex);
-		for(std::vector<FrameStreamingCallback*>::iterator cbIt=depthFrameCallbacks.begin();cbIt!=depthFrameCallbacks.end();++cbIt)
+		for(std::vector<FrameStreamingCallbackPtr>::iterator cbIt=depthFrameCallbacks.begin();cbIt!=depthFrameCallbacks.end();++cbIt)
 			(**cbIt)(frameBuffer);
 		}
 		
@@ -424,17 +428,41 @@ void RawKinectViewer::depthStreamingCallback(const Kinect::FrameBuffer& frameBuf
 		}
 	}
 
-void RawKinectViewer::requestAverageFrame(RawKinectViewer::AverageFrameReadyCallback* callback)
+void RawKinectViewer::requestAverageFrame(void)
 	{
+	/* Check that there isn't already is an average frame: */
+	if(!averageFrameValid)
+		{
+		/* Check if there is already an average frame capture underway: */
+		if(averageFrameCounter==0)
+			{
+			/* Start averaging frames: */
+			float* afdPtr=averageFrameDepth;
+			float* afdEnd=afdPtr+depthFrameSize.volume();
+			float* affPtr=averageFrameForeground;
+			for(;afdPtr!=afdEnd;++afdPtr,++affPtr)
+				{
+				*afdPtr=0.0f;
+				*affPtr=0.0f;
+				}
+			averageFrameCounter=averageNumFrames;
+			
+			/* Show a progress dialog: */
+			Vrui::popupPrimaryWidget(averageDepthFrameDialog);
+			}
+		}
+	}
+
+void RawKinectViewer::requestAverageFrame(RawKinectViewer::AverageFrameReadyCallback& callback)
+	{
+	/* Temporarily hold the given callback: */
+	AverageFrameReadyCallbackPtr temp(&callback);
+	
 	/* Check if there already is an average frame: */
 	if(averageFrameValid)
 		{
 		/* Just call the callback immediately and forget about it: */
-		if(callback!=0)
-			{
-			(*callback)(0);
-			delete callback;
-			}
+		callback(0);
 		}
 	else
 		{
@@ -457,8 +485,7 @@ void RawKinectViewer::requestAverageFrame(RawKinectViewer::AverageFrameReadyCall
 			}
 		
 		/* Add the callback to the callback list: */
-		if(callback!=0)
-			averageFrameReadyCallbacks.push_back(callback);
+		averageFrameReadyCallbacks.push_back(&callback);
 		}
 	}
 
@@ -563,7 +590,7 @@ void RawKinectViewer::captureBackgroundCallback(Misc::CallbackData* cbData)
 		}
 	backgroundCaptureNumFrames=150;
 	
-	camera->captureBackground(150,true);
+	camera->captureBackground(backgroundCaptureNumFrames,true);
 	}
 
 void RawKinectViewer::removeBackgroundCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData)
@@ -595,7 +622,7 @@ void RawKinectViewer::averageFramesCallback(GLMotif::ToggleButton::ValueChangedC
 	if(cbData->set)
 		{
 		/* Request a new average frame: */
-		requestAverageFrame(0);
+		requestAverageFrame();
 		}
 	else
 		{
@@ -981,7 +1008,8 @@ RawKinectViewer::RawKinectViewer(int& argc,char**& argv)
 	averageDepthFrameDialog=createAverageDepthFrameDialog();
 	
 	/* Start streaming: */
-	camera->startStreaming(Misc::createFunctionCall(this,&RawKinectViewer::colorStreamingCallback),Misc::createFunctionCall(this,&RawKinectViewer::depthStreamingCallback));
+	camera->setStreamingCallbacks(*Threads::createFunctionCall(this,&RawKinectViewer::colorStreamingCallback),*Threads::createFunctionCall(this,&RawKinectViewer::depthStreamingCallback));
+	camera->startStreaming();
 	
 	/* Select an invalid pixel: */
 	selectedPixel[0]=selectedPixel[1]=~0x0U;
@@ -1059,11 +1087,8 @@ void RawKinectViewer::frame(void)
 				averageFrameValid=true;
 				
 				/* Call all registered callbacks: */
-				for(std::vector<AverageFrameReadyCallback*>::iterator afrcIt=averageFrameReadyCallbacks.begin();afrcIt!=averageFrameReadyCallbacks.end();++afrcIt)
-					{
+				for(std::vector<AverageFrameReadyCallbackPtr>::iterator afrcIt=averageFrameReadyCallbacks.begin();afrcIt!=averageFrameReadyCallbacks.end();++afrcIt)
 					(**afrcIt)(0);
-					delete *afrcIt;
-					}
 				averageFrameReadyCallbacks.clear();
 				
 				/* Hide the progress dialog: */
@@ -1270,7 +1295,7 @@ void RawKinectViewer::display(GLContextData& contextData) const
 		dataItem->colorFrameVersion=colorFrameVersion;
 		}
 	
-	if(!intrinsicParameters.depthLensDistortion.isIdentity())
+	if(!intrinsicParameters.colorLensDistortion.isIdentity())
 		{
 		/* Create a grid of undistorted pixel positions: */
 		unsigned int gridSizeX=(colorFrameSize[0]+15U)/16U;

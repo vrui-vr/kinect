@@ -1,7 +1,7 @@
 /***********************************************************************
 Camera - Wrapper class to represent the color and depth camera interface
 aspects of the Kinect sensor.
-Copyright (c) 2010-2024 Oliver Kreylos
+Copyright (c) 2010-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -33,6 +33,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Misc/FileTests.h>
 #include <Misc/StandardValueCoders.h>
 #include <Misc/ConfigurationFile.h>
+#include <Threads/FunctionCalls.h>
 #include <USB/DeviceList.h>
 #include <IO/File.h>
 #include <IO/Directory.h>
@@ -60,6 +61,7 @@ void Camera::CalibrationParameters::read(int subsection,IO::File& file)
 	switch(subsection)
 		{
 		case 0:
+			/* Read the first parameter subsection: */
 			dxCenter=file.read<Misc::SInt32>();
 			ax=file.read<Misc::SInt32>();
 			bx=file.read<Misc::SInt32>();
@@ -92,16 +94,19 @@ void Camera::CalibrationParameters::read(int subsection,IO::File& file)
 			break;
 		
 		case 1:
+			/* Read the second parameter subsection: */
 			startLines=file.read<Misc::UInt16>();
 			endLines=file.read<Misc::UInt16>();
 			croppingLines=file.read<Misc::UInt16>();
 			break;
 		
 		case 2:
+			/* Read the third parameter subsection: */
 			constantShift=file.read<Misc::UInt16>();
 			break;
 		
 		case 3:
+			/* Read the fourth parameter subsection: */
 			dcmosEmitterDist=file.read<Misc::Float32>();
 			dcmosRcmosDist=file.read<Misc::Float32>();
 			referenceDistance=file.read<Misc::Float32>();
@@ -112,12 +117,14 @@ void Camera::CalibrationParameters::read(int subsection,IO::File& file)
 
 void Camera::CalibrationParameters::read(IO::File& file)
 	{
+	/* Write all four parameter subsections in sequence: */
 	for(int i=0;i<4;++i)
 		read(i,file);
 	}
 
 void Camera::CalibrationParameters::write(IO::File& file) const
 	{
+	/* Write the first parameter subsection: */
 	file.write<Misc::SInt32>(dxCenter);
 	file.write<Misc::SInt32>(ax);
 	file.write<Misc::SInt32>(bx);
@@ -148,23 +155,86 @@ void Camera::CalibrationParameters::write(IO::File& file) const
 	file.write<Misc::SInt32>(backComp2);
 	file.write<Misc::SInt32>(dydydyStart);
 	
+	/* Write the second parameter subsection: */
 	file.write<Misc::UInt16>(startLines);
 	file.write<Misc::UInt16>(endLines);
 	file.write<Misc::UInt16>(croppingLines);
 	
+	/* Write the third parameter subsection: */
 	file.write<Misc::UInt16>(constantShift);
 	
+	/* Write the fourth parameter subsection: */
 	file.write<Misc::Float32>(dcmosEmitterDist);
 	file.write<Misc::Float32>(dcmosRcmosDist);
 	file.write<Misc::Float32>(referenceDistance);
 	file.write<Misc::Float32>(referencePixelSize);
 	}
 
+/**********************************************
+Declaration of struct Camera::CameraParameters:
+**********************************************/
+
+struct Camera::CameraParameters
+	{
+	/* Elements: */
+	public:
+	unsigned short exposure; // Camera exposure time, 654==33ms, 0==500ms
+	unsigned short sharpening; // Bits 0-2 are sharpening factor from 0% to 200%; bit 3 enables automatic sharpening reduction
+	unsigned short operatingMode; // Bit field defining the camera's operating mode
+	};
+
+/********************************************
+Declaration of struct Camera::StreamingState:
+********************************************/
+
+struct Camera::StreamingState
+	{
+	/* Elements: */
+	public:
+	Camera* camera; // Pointer to camera object owning this streaming state
+	unsigned int packetFlagBase; // Base value for stream's packet header flags
+	int packetSize; // Size of isochronous packets in bytes
+	int numPackets; // Number of packets per transfer
+	int numTransfers; // Size of transfer ring buffer to handle delays or transfer bursts
+	unsigned char** transferBuffers; // Array of transfer buffers
+	libusb_transfer** transfers; // Array of transfer structures
+	volatile int numActiveTransfers; // Number of currently active transfers to properly handle cancellation
+	
+	Size frameSize; // Size of streamed frames in pixels
+	size_t rawFrameSize; // Total size of encoded frames received from the camera
+	unsigned char* rawFrameBuffer; // Double buffer to assemble an encoded frame during streaming and hold a previous frame for processing
+	int activeBuffer; // Index of buffer half currently receiving frame data from the camera
+	double activeFrameTimeStamp; // Time stamp for the frame currently being received
+	unsigned char* writePtr; // Current write position in active buffer half
+	size_t bufferSpace; // Number of bytes still to be written into active buffer half
+	
+	Threads::MutexCond frameReadyCond; // Condition variable to signal completion of a new frame to the decoding thread
+	bool readyFrameIntact; // Flag whether the completed frame was received intact
+	unsigned char* volatile readyFrame; // Pointer to buffer half containing the completed frame
+	double readyFrameTimeStamp; // Time stamp of completed frame
+	volatile bool cancelDecoding; // Flag to cancel the deocding thread
+	Threads::Thread decodingThread; // Thread to decode raw frames into user-visible format
+	
+	StreamingCallback& streamingCallback; // Reference to the callback to be called when a new frame has been decoded
+	
+	#if KINECT_CAMERA_DUMP_HEADERS
+	IO::FilePtr headerFile;
+	#endif
+	
+	/* Constructors and destructors: */
+	public:
+	StreamingState(libusb_device_handle* handle,unsigned int endpoint,Camera* sCamera,int sPacketFlagBase,int sPacketSize,const Size& sFrameSize,size_t sRawFrameSize,StreamingCallback& sStreamingCallback); // Prepares a streaming state for streaming
+	~StreamingState(void); // Cleanly stops streaming and destroys the streaming state
+	
+	/* Methods: */
+	static void transferCallback(libusb_transfer* transfer); // Callback called when a USB transfer completes or is cancelled
+	};
+
 /***************************************
 Methods of class Camera::StreamingState:
 ***************************************/
 
-Camera::StreamingState::StreamingState(libusb_device_handle* handle,unsigned int endpoint,Camera* sCamera,int sPacketFlagBase,int sPacketSize,const Size& sFrameSize,size_t sRawFrameSize,Camera::StreamingCallback* sStreamingCallback)
+Camera::StreamingState::StreamingState(libusb_device_handle* handle,unsigned int endpoint,Camera* sCamera,int sPacketFlagBase,int sPacketSize,const Size& sFrameSize,size_t sRawFrameSize,Camera::StreamingCallback& sStreamingCallback)
 	:camera(sCamera),
 	 packetFlagBase(sPacketFlagBase),
 	 packetSize(sPacketSize),numPackets(16),numTransfers(32),
@@ -190,10 +260,10 @@ Camera::StreamingState::StreamingState(libusb_device_handle* handle,unsigned int
 			if(libusb_submit_transfer(transfers[i])==0)
 				++numActiveTransfers;
 			else
-				Misc::formattedConsoleError("Kinect::Camera: Error submitting USB transfer %d",i);
+				Misc::sourcedConsoleError(__PRETTY_FUNCTION__,"Error submitting USB transfer %d",i);
 			}
 		else
-			Misc::formattedConsoleError("Kinect::Camera: Error allocating USB transfer %d",i);
+			Misc::sourcedConsoleError(__PRETTY_FUNCTION__,"Error allocating USB transfer %d",i);
 		}
 	}
 
@@ -230,9 +300,6 @@ Camera::StreamingState::~StreamingState(void)
 	
 	/* Destroy the raw frame buffer: */
 	delete[] rawFrameBuffer;
-	
-	/* Destroy the streaming callback: */
-	delete streamingCallback;
 	}
 
 void Camera::StreamingState::transferCallback(libusb_transfer* transfer)
@@ -319,7 +386,7 @@ void Camera::StreamingState::transferCallback(libusb_transfer* transfer)
 			
 			/* Check if submitting the transfer failed due to an error: */
 			if(!thisPtr->cancelDecoding)
-				Misc::consoleError("Kinect::Camera: Error submitting USB transfer; camera may stop working soon");
+				Misc::sourcedConsoleError(__PRETTY_FUNCTION__,"Error submitting USB transfer; camera may stop working soon");
 			}
 		}
 	else if(transfer->status==LIBUSB_TRANSFER_CANCELLED)
@@ -617,7 +684,7 @@ void* Camera::colorDecodingThreadMethod(void)
 		*(cPtr++)=rPtr[-1];
 		
 		/* Pass the decoded color buffer to the streaming callback function: */
-		(*streamers[COLOR]->streamingCallback)(decodedFrame);
+		streamers[COLOR]->streamingCallback(decodedFrame);
 		}
 	
 	return 0;
@@ -678,13 +745,17 @@ void* Camera::depthDecodingThreadMethod(void)
 		processDepthFrameBackground(decodedFrame);
 		
 		/* Pass the decoded depth buffer to the streaming callback function: */
-		(*streamers[DEPTH]->streamingCallback)(decodedFrame);
+		streamers[DEPTH]->streamingCallback(decodedFrame);
 		}
 	
 	return 0;
 	}
 
 namespace {
+
+/****************
+Helper functions:
+****************/
 
 inline unsigned int getNybble(Misc::UInt8*& sPtr,bool& sFull)
 	{
@@ -808,7 +879,7 @@ void* Camera::compressedDepthDecodingThreadMethod(void)
 		processDepthFrameBackground(decodedFrame);
 		
 		/* Pass the decoded depth buffer to the streaming callback function: */
-		(*streamers[DEPTH]->streamingCallback)(decodedFrame);
+		streamers[DEPTH]->streamingCallback(decodedFrame);
 		}
 	
 	return 0;
@@ -895,6 +966,41 @@ void Camera::initialize(USB::DeviceList* deviceList)
 	
 	streamers[0]=0;
 	streamers[1]=0;
+	}
+
+void Camera::resetCameras(void)
+	{
+	if(streamers[DEPTH]!=0&&hasNearMode&&nearMode)
+		{
+		/* Reset to far mode: */
+		sendCommand(0x02efU,0x0190U);
+		}
+	
+	/* Send commands to stop streaming: */
+	sendCommand(0x0005U,0x0000U); // Disable color streaming
+	sendCommand(0x0006U,0x0000U); // Disable depth streaming (and turn off IR projector)
+	
+	/* Destroy the streaming states: */
+	for(int i=0;i<2;++i)
+		{
+		delete streamers[i];
+		streamers[i]=0;
+		}
+	
+	#if KINECT_CAMERA_DUMP_HEADERS
+	headerFile=0;
+	#endif
+	
+	/* Release the interface and re-attach the kernel driver: */
+	if(needAltInterface)
+		{
+		/* Switch the camera back to the original interface setting: */
+		device.setAlternateSetting(0,0);
+		}
+	device.releaseInterface(0);
+	// device.setConfiguration(1); // This seems to confuse the device
+	// device.reset(); // This seems to confuse the device
+	device.close();
 	}
 
 void Camera::nearModeToggleCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData)
@@ -1019,9 +1125,8 @@ Camera::Camera(const char* serialNumber)
 
 Camera::~Camera(void)
 	{
-	/* Stop streaming if necessary: */
-	if(streamers[0]!=0||streamers[1]!=0)
-		stopStreaming();
+	/* Stop streaming just in case: */
+	stopStreaming();
 	}
 
 FrameSource::DepthCorrection* Camera::getDepthCorrectionParameters(void)
@@ -1049,7 +1154,7 @@ FrameSource::DepthCorrection* Camera::getDepthCorrectionParameters(void)
 		catch(const std::runtime_error& err)
 			{
 			/* Log an error: */
-			Misc::formattedConsoleError("Kinect::Camera::getDepthCorrectionParameters: Could not load depth correction file %s due to exception %s",depthCorrectionFileName.c_str(),err.what());
+			Misc::sourcedConsoleError(__PRETTY_FUNCTION__,"Cannot load depth correction file %s due to exception %s",depthCorrectionFileName.c_str(),err.what());
 			
 			/* Return a default depth correction object: */
 			return FrameSource::getDepthCorrectionParameters();
@@ -1092,7 +1197,7 @@ FrameSource::IntrinsicParameters Camera::getIntrinsicParameters(void)
 	catch(const std::runtime_error& err)
 		{
 		/* Log an error: */
-		Misc::formattedConsoleError("Kinect::Camera::getIntrinsicParameters: Could not load intrinsic parameter file %s due to exception %s",intrinsicParameterFileName.c_str(),err.what());
+		Misc::sourcedConsoleError(__PRETTY_FUNCTION__,"Cannot load intrinsic parameter file %s due to exception %s",intrinsicParameterFileName.c_str(),err.what());
 		
 		/* Extract intrinsic parameters from the Kinect's factory calibration data: */
 		CalibrationParameters calib;
@@ -1134,7 +1239,7 @@ FrameSource::DepthRange Camera::getDepthRange(void) const
 	return DepthRange(300,1100);
 	}
 
-void Camera::startStreaming(FrameSource::StreamingCallback* newColorStreamingCallback,FrameSource::StreamingCallback* newDepthStreamingCallback)
+void Camera::startStreaming(void)
 	{
 	/* Open and prepare the device: */
 	device.open();
@@ -1161,7 +1266,7 @@ void Camera::startStreaming(FrameSource::StreamingCallback* newColorStreamingCal
 			}
 		catch(const std::runtime_error& err)
 			{
-			Misc::formattedConsoleWarning("Kinect::Camera::startStreaming: Caught exception %s; retrying to wake up Kinect camera %s",err.what(),getSerialNumber().c_str());
+			Misc::sourcedConsoleWarning(__PRETTY_FUNCTION__,"Caught exception %s; retrying to wake up Kinect camera %s",err.what(),getSerialNumber().c_str());
 			usleep(100000);
 			}
 		}
@@ -1185,12 +1290,12 @@ void Camera::startStreaming(FrameSource::StreamingCallback* newColorStreamingCal
 	#endif
 	
 	/* Check if caller wants to receive color frames: */
-	if(newColorStreamingCallback!=0)
+	if(colorStreamingCallback!=0)
 		{
 		/* Create the color streaming state: */
 		const Size& colorFrameSize=getActualFrameSize(COLOR);
 		size_t rawFrameSize=colorFrameSize.volume(); // Bayer pattern; one byte per pixel
-		streamers[COLOR]=new StreamingState(device.getDeviceHandle(),0x81U,this,0x80U,1920,colorFrameSize,rawFrameSize,newColorStreamingCallback);
+		streamers[COLOR]=new StreamingState(device.getDeviceHandle(),0x81U,this,0x80U,1920,colorFrameSize,rawFrameSize,*colorStreamingCallback);
 		
 		#if KINECT_CAMERA_DUMP_HEADERS
 		streamers[COLOR]->headerFile=headerFile;
@@ -1201,12 +1306,12 @@ void Camera::startStreaming(FrameSource::StreamingCallback* newColorStreamingCal
 		}
 	
 	/* Check if caller wants to receive depth frames: */
-	if(newDepthStreamingCallback!=0)
+	if(depthStreamingCallback!=0)
 		{
 		/* Create the depth streaming state: */
 		const Size& depthFrameSize=getActualFrameSize(DEPTH);
 		size_t rawFrameSize=(depthFrameSize.volume()*11+7)/8; // Packed bitstream; 11 bits per pixel
-		streamers[DEPTH]=new StreamingState(device.getDeviceHandle(),0x82U,this,0x70U,1760,depthFrameSize,rawFrameSize,newDepthStreamingCallback);
+		streamers[DEPTH]=new StreamingState(device.getDeviceHandle(),0x82U,this,0x70U,1760,depthFrameSize,rawFrameSize,*depthStreamingCallback);
 		
 		#if KINECT_CAMERA_DUMP_HEADERS
 		streamers[DEPTH]->headerFile=headerFile;
@@ -1316,56 +1421,27 @@ void Camera::startStreaming(FrameSource::StreamingCallback* newColorStreamingCal
 	if(!sequenceOk)
 		{
 		/* Reset camera device to non-streaming state and clean up: */
-		stopStreaming();
+		resetCameras();
 		
 		/* Signal an error: */
-		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Failed to initialize streaming mode");
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Cannot initialize streaming mode");
 		}
+	
+	/* Call the base class method: */
+	DirectFrameSource::startStreaming();
 	}
 
 void Camera::stopStreaming(void)
 	{
 	/* Bail out if not actually streaming: */
-	if(streamers[0]==0&&streamers[1]==0)
+	if(!streaming)
 		return;
 	
-	if(streamers[DEPTH]!=0&&hasNearMode&&nearMode)
-		{
-		/* Reset to far mode: */
-		sendCommand(0x02efU,0x0190U);
-		}
+	/* Call the base class method: */
+	DirectFrameSource::stopStreaming();
 	
-	/* Send commands to stop streaming: */
-	sendCommand(0x0005U,0x0000U); // Disable color streaming
-	sendCommand(0x0006U,0x0000U); // Disable depth streaming (and turn off IR projector)
-	
-	/* Destroy the streaming states: */
-	for(int i=0;i<2;++i)
-		{
-		delete streamers[i];
-		streamers[i]=0;
-		}
-	
-	/* Destroy the background removal buffer: */
-	backgroundCaptureNumFrames=0;
-	delete[] backgroundFrame;
-	backgroundFrame=0;
-	removeBackground=false;
-	
-	#if KINECT_CAMERA_DUMP_HEADERS
-	headerFile=0;
-	#endif
-	
-	/* Release the interface and re-attach the kernel driver: */
-	if(needAltInterface)
-		{
-		/* Switch the camera back to the original interface setting: */
-		device.setAlternateSetting(0,0);
-		}
-	device.releaseInterface(0);
-	// device.setConfiguration(1); // This seems to confuse the device
-	// device.reset(); // This seems to confuse the device
-	device.close();
+	/* Reset camera device to non-streaming state and clean up: */
+	resetCameras();
 	}
 
 std::string Camera::getSerialNumber(void)

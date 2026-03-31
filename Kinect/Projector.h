@@ -2,7 +2,7 @@
 Projector - Class to project a depth frame captured from a Kinect camera
 back into calibrated 3D camera space, and texture-map it with a matching
 color frame.
-Copyright (c) 2010-2025 Oliver Kreylos
+Copyright (c) 2010-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -25,6 +25,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #ifndef KINECT_PROJECTOR_INCLUDED
 #define KINECT_PROJECTOR_INCLUDED
 
+#include <Misc/Autopointer.h>
 #include <Threads/MutexCond.h>
 #include <Threads/Thread.h>
 #include <Threads/TripleBuffer.h>
@@ -35,7 +36,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Kinect/ProjectorBase.h>
 
 /* Forward declarations: */
-namespace Misc {
+namespace Threads {
 template <class ParameterParam>
 class FunctionCall;
 }
@@ -46,7 +47,7 @@ class Projector:public ProjectorBase,public GLObject
 	{
 	/* Embedded classes: */
 	public:
-	typedef Misc::FunctionCall<const MeshBuffer&> StreamingCallback; // Function call type for streaming callbacks
+	typedef Threads::FunctionCall<const MeshBuffer&> StreamingCallback; // Function call type for streaming callbacks
 	
 	struct DataItem:public GLObject::DataItem // Structure containing per-context state
 		{
@@ -76,7 +77,7 @@ class Projector:public ProjectorBase,public GLObject
 	Threads::Thread depthFrameProcessingThread; // Background thread to process incoming depth frames for rendering
 	Threads::TripleBuffer<MeshBuffer> meshes; // Triple buffer of meshes ready for rendering
 	unsigned int meshVersion; // Version number of current mesh
-	StreamingCallback* streamingCallback; // Function to be called when a new mesh has been produced
+	Misc::Autopointer<StreamingCallback> streamingCallback; // Function to be called when a new mesh has been produced
 	Threads::TripleBuffer<FrameBuffer> colorFrames; // Triple buffer of color frames ready for rendering
 	unsigned int colorFrameVersion; // Version number of current color frame
 	
@@ -102,7 +103,7 @@ class Projector:public ProjectorBase,public GLObject
 		}
 	void setFilterDepthFrames(bool newFilterDepthFrames,bool newLowpassDepthFrames); // Enables or disables temporal and spatial depth frame filtering
 	void processDepthFrame(const FrameBuffer& depthFrame,MeshBuffer& meshBuffer) const; // Processes the given depth frame into the given mesh buffer immediately and returns the resuling mesh
-	void startStreaming(StreamingCallback* newStreamingCallback); // Starts processing depth frames in the background; calls the provided callback function every time a new mesh is produced
+	void startStreaming(StreamingCallback& newStreamingCallback); // Starts processing depth frames in the background; calls the provided callback function every time a new mesh is produced
 	void setDepthFrame(const FrameBuffer& newDepthFrame); // Updates the projector's current depth frame in streaming mode; can be called from any thread
 	void setMesh(const MeshBuffer& newMesh); // Updates the projector's current mesh in streaming mode; can be called from any thread
 	void setColorFrame(const FrameBuffer& newColorFrame); // Updates the projector's current color frame in streaming mode; can be called from any thread

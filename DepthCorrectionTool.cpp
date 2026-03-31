@@ -1,6 +1,6 @@
 /***********************************************************************
 DepthCorrectionTool - Calibration tool for RawKinectViewer.
-Copyright (c) 2012-2025 Oliver Kreylos
+Copyright (c) 2012-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -26,6 +26,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <iostream>
 #include <Misc/SizedTypes.h>
 #include <Misc/StringPrintf.h>
+#include <Threads/FunctionCalls.h>
 #include <IO/File.h>
 #include <IO/OpenFile.h>
 #include <Math/Matrix.h>
@@ -167,7 +168,7 @@ void DepthCorrectionTool::buttonCallback(int buttonSlotIndex,Vrui::InputDevice::
 		if(buttonSlotIndex==0)
 			{
 			/* Request an average depth frame from the main application: */
-			application->requestAverageFrame(Misc::createFunctionCall(this,&DepthCorrectionTool::averageDepthFrameReady));
+			application->requestAverageFrame(*Threads::createFunctionCall(this,&DepthCorrectionTool::averageDepthFrameReady));
 			}
 		else
 			{

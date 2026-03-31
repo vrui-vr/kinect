@@ -1,7 +1,7 @@
 /***********************************************************************
 DiskExtractor - Helper class to extract the 3D center points of disks
 from depth images.
-Copyright (c) 2015-2025 Oliver Kreylos
+Copyright (c) 2015-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -30,7 +30,8 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 
 #include <stdexcept>
 #include <Misc/Utility.h>
-#include <Misc/FunctionCalls.h>
+#include <Misc/StdError.h>
+#include <Threads/FunctionCalls.h>
 #include <Math/Math.h>
 #include <Math/Constants.h>
 #include <Geometry/Matrix.h>
@@ -400,7 +401,7 @@ void* DiskExtractor::diskExtractorThreadMethod(void)
 		Scalar drMin,drMax;
 		Scalar df;
 		unsigned int tp;
-		TrackingCallback* tc;
+		Misc::Autopointer<TrackingCallback> tc;
 		{
 		Threads::MutexCond::Lock newFrameLock(newFrameCond);
 		
@@ -539,8 +540,7 @@ DiskExtractor::DiskExtractor(const Size& sFrameSize,const FrameSource::DepthCorr
 	 minNumPixels(500),
 	 diskRadius(60),diskRadiusMargin(1.1),diskFlatness(5.0),
 	 keepProcessing(false),
-	 extractionResultCallback(0),
-	 trackingPixel(~0x0U),trackingCallback(0)
+	 trackingPixel(~0x0U)
 	{
 	if(dc!=0)
 		{
@@ -562,8 +562,7 @@ DiskExtractor::DiskExtractor(const Size& sFrameSize,const DiskExtractor::PixelDe
 	 minNumPixels(500),
 	 diskRadius(60),diskRadiusMargin(1.1),diskFlatness(5.0),
 	 keepProcessing(false),
-	 extractionResultCallback(0),
-	 trackingPixel(~0x0U),trackingCallback(0)
+	 trackingPixel(~0x0U)
 	{
 	/* Pre-compute a 2D array of image pixel positions with averaging weights: */
 	createImagePoints(ips);
@@ -594,8 +593,6 @@ DiskExtractor::~DiskExtractor(void)
 	if(privateDepthCorrection)
 		delete[] depthCorrection;
 	delete[] framePixels;
-	delete extractionResultCallback;
-	delete trackingCallback;
 	}
 
 void DiskExtractor::setMaxBlobMergeDist(int newMaxBlobMergeDist)
@@ -637,7 +634,7 @@ DiskExtractor::DiskList DiskExtractor::processFrame(const FrameBuffer& frame) co
 	Scalar drMax=diskRadius*diskRadiusMargin;
 	Scalar df=diskFlatness;
 	unsigned int tp=trackingPixel;
-	TrackingCallback* tc=trackingCallback;
+	Misc::Autopointer<TrackingCallback> tc=trackingCallback;
 	
 	/* Extract all foreground blobs from the raw depth frame: */
 	const DepthPixel* depthFramePixels=frame.getData<DepthPixel>();
@@ -731,17 +728,17 @@ DiskExtractor::DiskList DiskExtractor::processFrame(const FrameBuffer& frame) co
 	return extractionResult;
 	}
 
-void DiskExtractor::startStreaming(DiskExtractor::ExtractionResultCallback* newExtractionResultCallback)
+void DiskExtractor::startStreaming(DiskExtractor::ExtractionResultCallback& newExtractionResultCallback)
 	{
+	/* Temporarily hold the given callback: */
+	Misc::Autopointer<ExtractionResultCallback> temp(&newExtractionResultCallback);
+	
 	/* Bail out if already streaming: */
 	if(!diskExtractorThread.isJoined())
-		{
-		delete newExtractionResultCallback;
-		throw std::runtime_error("DiskExtractor::startStreaming: Streaming already in progress");
-		}
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Streaming already in progress");
 	
 	/* Remember the result callback: */
-	extractionResultCallback=newExtractionResultCallback;
+	extractionResultCallback=std::move(temp);
 	
 	/* Start the disk extraction thread: */
 	keepProcessing=true;
@@ -767,14 +764,14 @@ void DiskExtractor::stopStreaming(void)
 	/* Wait until the disk extraction thread terminates: */
 	diskExtractorThread.join();
 	
-	delete extractionResultCallback;
+	/* Release the result callback: */
 	extractionResultCallback=0;
 	}
 
-void DiskExtractor::startTracking(DiskExtractor::TrackingCallback* newTrackingCallback)
+void DiskExtractor::startTracking(DiskExtractor::TrackingCallback& newTrackingCallback)
 	{
 	/* Store the callback: */
-	trackingCallback=newTrackingCallback;
+	trackingCallback=&newTrackingCallback;
 	}
 
 void DiskExtractor::setTrackingPixel(unsigned int trackingX,unsigned int trackingY)
@@ -788,10 +785,8 @@ void DiskExtractor::stopTracking(void)
 	/* Reset the tracking pixel index: */
 	trackingPixel=~0x0U;
 	
-	/* Delete the tracking callback: */
-	TrackingCallback* tc=trackingCallback;
+	/* Release the tracking callback: */
 	trackingCallback=0;
-	delete tc;
 	}
 
 }

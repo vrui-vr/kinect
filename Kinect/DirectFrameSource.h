@@ -1,7 +1,7 @@
 /***********************************************************************
 DirectFrameSource - Intermediate class for frame sources that are
 directly connected to a camera device.
-Copyright (c) 2015-2016 Oliver Kreylos
+Copyright (c) 2015-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -26,8 +26,10 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 
 #include <string>
 #include <Misc/SelfDestructPointer.h>
+#include <Misc/Autopointer.h>
 #include <Misc/CallbackData.h>
 #include <Misc/CallbackList.h>
+#include <Threads/Mutex.h>
 #include <GLMotif/Button.h>
 #include <GLMotif/ToggleButton.h>
 #include <GLMotif/TextFieldSlider.h>
@@ -36,9 +38,11 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 
 /* Forward declarations: */
 namespace Misc {
+class ConfigurationFileSection;
+}
+namespace Threads {
 template <class ParameterParam>
 class FunctionCall;
-class ConfigurationFileSection;
 }
 namespace IO {
 class File;
@@ -54,7 +58,8 @@ class DirectFrameSource:public FrameSource
 	{
 	/* Embedded classes: */
 	public:
-	typedef Misc::FunctionCall<DirectFrameSource&> BackgroundCaptureCallback; // Function call type for completion of background capture callback
+	typedef Threads::FunctionCall<DirectFrameSource&> BackgroundCaptureCallback; // Function call type for completion of background capture callback
+	typedef Misc::Autopointer<BackgroundCaptureCallback> BackgroundCaptureCallbackPtr; // Type for smart pointers to background capture callbacks
 	
 	class CallbackData:public Misc::CallbackData // Base class for camera-related events
 		{
@@ -84,9 +89,11 @@ class DirectFrameSource:public FrameSource
 	private:
 	static Misc::SelfDestructPointer<GLMotif::FileSelectionHelper> backgroundSelectionHelper; // Helper object to select background files for loading/saving
 	protected:
+	Threads::Mutex backgroundCaptureMutex; // Mutex protecting the source's background capture state
+	size_t backgroundFrameSize; // Number of pixels in the current background frame
 	DepthPixel* backgroundFrame; // The camera's current background frame
 	unsigned int backgroundCaptureNumFrames; // Number of background frames left to capture
-	BackgroundCaptureCallback* backgroundCaptureCallback; // Function to call upon completion of background capture
+	BackgroundCaptureCallbackPtr backgroundCaptureCallback; // Function to call upon completion of background capture
 	bool removeBackground; // Flag whether to remove background information during frame processing
 	Misc::SInt16 backgroundRemovalFuzz; // Fuzz value for background removal (positive values: more aggressive removal)
 	Misc::CallbackList intrinsicParametersChangedCallbacks; // List of callbacks to be called when the camera's intrinsic parameters change
@@ -109,8 +116,9 @@ class DirectFrameSource:public FrameSource
 	DirectFrameSource(void);
 	virtual ~DirectFrameSource(void);
 	
-	/* Methods from FrameSource: */
+	/* Methods from class FrameSource: */
 	virtual ExtrinsicParameters getExtrinsicParameters(void);
+	virtual void stopStreaming(void);
 	
 	/* New methods: */
 	virtual std::string getSerialNumber(void) =0; // Returns the camera's serial number, unique among all camera device types
@@ -120,7 +128,8 @@ class DirectFrameSource:public FrameSource
 		{
 		return intrinsicParametersChangedCallbacks;
 		}
-	virtual void captureBackground(unsigned int numFrames,bool replace =false,BackgroundCaptureCallback* newBackgroundCaptureCallback =0); // Captures the given number of frames to create a background removal buffer and calls optional callback upon completion
+	virtual void captureBackground(unsigned int numFrames,bool replace =false); // Captures the given number of frames to create a background removal buffer, initializes a current background buffer if the reset flag is true; throws exception if there is already a background capture in progress
+	virtual void captureBackground(unsigned int numFrames,BackgroundCaptureCallback& newBackgroundCaptureCallback,bool replace =false); // Ditto; calls the given callback when the background capture is complete
 	virtual bool loadDefaultBackground(void); // Loads the default background removal buffer for this camera; returns true if background was loaded
 	virtual void loadBackground(const char* fileNamePrefix); // Loads a background removal buffer from a file with the given prefix
 	virtual void loadBackground(IO::File& file); // Ditto, from already opened file

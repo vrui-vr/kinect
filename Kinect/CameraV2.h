@@ -1,6 +1,6 @@
 /***********************************************************************
 CameraV2 - Class representing a Kinect v2 camera.
-Copyright (c) 2015-2022 Oliver Kreylos
+Copyright (c) 2015-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -70,7 +70,7 @@ class CameraV2:public DirectFrameSource
 	virtual DepthCorrection* getDepthCorrectionParameters(void);
 	virtual IntrinsicParameters getIntrinsicParameters(void);
 	virtual const Size& getActualFrameSize(int sensor) const;
-	virtual void startStreaming(StreamingCallback* newColorStreamingCallback,StreamingCallback* newDepthStreamingCallback);
+	virtual void startStreaming(void);
 	virtual void stopStreaming(void);
 	
 	/* Methods from class DirectFrameSource: */

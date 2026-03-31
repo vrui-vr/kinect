@@ -1,6 +1,6 @@
 /***********************************************************************
 CameraV2 - Class representing a Kinect v2 camera.
-Copyright (c) 2015-2025 Oliver Kreylos
+Copyright (c) 2015-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -25,6 +25,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <libusb-1.0/libusb.h>
 #include <Misc/StdError.h>
 #include <Misc/MessageLogger.h>
+#include <Threads/FunctionCalls.h>
 #include <IO/File.h>
 #include <IO/Directory.h>
 #include <USB/DeviceList.h>
@@ -193,7 +194,7 @@ FrameSource::DepthCorrection* CameraV2::getDepthCorrectionParameters(void)
 		catch(const std::runtime_error& err)
 			{
 			/* Log an error: */
-			Misc::formattedConsoleError("Kinect::CameraV2::getDepthCorrectionParameters: Could not load depth correction file %s due to exception %s",depthCorrectionFileName.c_str(),err.what());
+			Misc::sourcedConsoleError(__PRETTY_FUNCTION__,"Cannot load depth correction file %s due to exception %s",depthCorrectionFileName.c_str(),err.what());
 			
 			/* Return a default depth correction object: */
 			return FrameSource::getDepthCorrectionParameters();
@@ -247,7 +248,7 @@ FrameSource::IntrinsicParameters CameraV2::getIntrinsicParameters(void)
 		catch(const std::runtime_error& err)
 			{
 			/* Log an error: */
-			Misc::formattedConsoleError("Kinect::CameraV2::getIntrinsicParameters: Could not load intrinsic parameter file %s due to exception %s",intrinsicParameterFileName.c_str(),err.what());
+			Misc::sourcedConsoleError(__PRETTY_FUNCTION__,"Cannot load intrinsic parameter file %s due to exception %s",intrinsicParameterFileName.c_str(),err.what());
 			}
 		}
 	else
@@ -292,55 +293,59 @@ const Size& CameraV2::getActualFrameSize(int sensor) const
 	return frameSizes[sensor];
 	}
 
-void CameraV2::startStreaming(FrameSource::StreamingCallback* newColorStreamingCallback,FrameSource::StreamingCallback* newDepthStreamingCallback)
+void CameraV2::startStreaming(void)
 	{
+	/* Check if color streaming is requested: */
 	USB::TransferPool::UserTransferCallback* colorTransferCallback=0;
-	if(newColorStreamingCallback!=0)
+	if(colorStreamingCallback!=0)
 		{
 		/* Set up a bulk transfer pool to receive color data: */
 		colorTransfers=new USB::TransferPool(100,0x8000); // Allocate 40 extra buffers to prevent underrun
 		
 		/* Set up the color image processing pipeline: */
-		colorTransferCallback=colorStreamReader->startStreaming(colorTransfers,newColorStreamingCallback);
+		colorTransferCallback=colorStreamReader->startStreaming(colorTransfers,*colorStreamingCallback);
 		}
 	
+	/* Check if depth streaming is requested: */
 	USB::TransferPool::UserTransferCallback* depthTransferCallback=0;
-	if(newDepthStreamingCallback!=0)
+	if(depthStreamingCallback!=0)
 		{
 		/* Set up an isochronous transfer pool to receive depth data: */
 		// depthTransfers=new USB::TransferPool(21,8,device.getMaxIsoPacketSize(0x84)); // Allocate 1 extra buffer to prevent underrun
 		depthTransfers=new USB::TransferPool(21,8,33792); // Ignore what libusb says
 		
 		/* Set up the depth image processing pipeline: */
-		depthTransferCallback=depthStreamReader->startStreaming(depthTransfers,newDepthStreamingCallback);
+		depthTransferCallback=depthStreamReader->startStreaming(depthTransfers,*depthStreamingCallback);
 		}
 	
-	if(newColorStreamingCallback!=0||newDepthStreamingCallback!=0)
-		{
-		/* Start the Kinect's sensors: */
+	/* Start the Kinect's sensors if color and/or depth streaming is requested: */
+	if(colorStreamingCallback!=0||depthStreamingCallback!=0)
 		commandDispatcher->startSensors();
-		}
 	
-	/* Read color and depth data from the Kinect: */
-	if(newColorStreamingCallback!=0)
-		colorTransfers->submit(device,0x83,30,colorTransferCallback);
-	if(newDepthStreamingCallback!=0)
-		depthTransfers->submit(device,0x84,20,depthTransferCallback);
+	/* Read color and/or depth data from the Kinect: */
+	if(colorStreamingCallback!=0)
+		colorTransfers->submit(device,0x83,30,*colorTransferCallback);
+	if(depthStreamingCallback!=0)
+		depthTransfers->submit(device,0x84,20,*depthTransferCallback);
+	
+	/* Call the base class method: */
+	DirectFrameSource::startStreaming();
 	}
 
 void CameraV2::stopStreaming(void)
 	{
+	/* Call the base class method: */
+	DirectFrameSource::stopStreaming();
+	
 	/* Cancel all pending USB transfers: */
 	if(colorTransfers!=0)
 		colorTransfers->cancel();
 	if(depthTransfers!=0)
 		depthTransfers->cancel();
 	
+	/* Stop the Kinect's sensors if color and/or depth streaming was requested: */
 	if(colorTransfers!=0||depthTransfers!=0)
-		{
-		/* Stop the Kinect's sensors: */
 		commandDispatcher->stopSensors();
-		}
 	
 	/* Shut down the color and depth image processing pipelines: */
 	if(colorTransfers!=0)

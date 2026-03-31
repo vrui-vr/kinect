@@ -1,7 +1,7 @@
 /***********************************************************************
 Renderer - Helper class to receive a 3D video stream from a frame
 source, and render it into an OpenGL context using a projector.
-Copyright (c) 2012-2016 Oliver Kreylos
+Copyright (c) 2012-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -24,12 +24,13 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #ifndef KINECT_RENDERER_INCLUDED
 #define KINECT_RENDERER_INCLUDED
 
+#include <Misc/Autopointer.h>
 #include <Kinect/Config.h>
 #include <Kinect/FrameSource.h>
 #include <Kinect/ProjectorType.h>
 
 /* Forward declarations: */
-namespace Misc {
+namespace Threads {
 template <class ParameterParam>
 class FunctionCall;
 }
@@ -47,13 +48,13 @@ class Renderer
 	{
 	/* Embedded classes: */
 	public:
-	typedef Misc::FunctionCall<void> StreamingCallback; // Function call type for streaming callbacks
+	typedef Threads::FunctionCall<int> StreamingCallback; // Function call type for streaming callbacks; the int argument is a dummy argument
 	
 	/* Elements: */
 	private:
 	FrameSource* source; // Pointer to the 3D video frame source
 	ProjectorType* projector; // Pointer to the projector of configured type
-	StreamingCallback* streamingCallback; // Function to be called when the state of the projector has changed
+	Misc::Autopointer<StreamingCallback> streamingCallback; // Function to be called when the state of the projector has changed
 	bool enabled; // Flag whether the renderer is currently enabled, i.e., receiving and rendering 3D video frames
 	
 	/* Private methods: */
@@ -78,7 +79,7 @@ class Renderer
 		return *projector;
 		}
 	void setTimeBase(const FrameSource::Time& newTimeBase); // Sets the time base of the connected frame source
-	void startStreaming(StreamingCallback* newStreamingCallback); // Starts streaming 3D video frames from the frame source into the projector for rendering; calls given callback every time the projector has new data; adopts callback object
+	void startStreaming(StreamingCallback& newStreamingCallback); // Starts streaming 3D video frames from the frame source into the projector for rendering; calls given callback every time the projector has new data
 	void frame(void); // Called once per application frame to update renderer state
 	void glRenderAction(GLContextData& contextData) const; // Draws the renderer's current state into the given OpenGL context
 	};

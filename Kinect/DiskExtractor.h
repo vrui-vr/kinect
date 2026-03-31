@@ -1,7 +1,7 @@
 /***********************************************************************
 DiskExtractor - Helper class to extract the 3D center points of disks
 from depth images.
-Copyright (c) 2015-2025 Oliver Kreylos
+Copyright (c) 2015-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -25,6 +25,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #define KINECT_DISKEXTRACTOR_INCLUDED
 
 #include <vector>
+#include <Misc/Autopointer.h>
 #include <Threads/Thread.h>
 #include <Threads/MutexCond.h>
 #include <Geometry/Point.h>
@@ -36,7 +37,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Kinect/FrameSource.h>
 
 /* Forward declarations: */
-namespace Misc {
+namespace Threads {
 template <class ParameterParam>
 class FunctionCall;
 }
@@ -71,8 +72,8 @@ class DiskExtractor
 		};
 	
 	typedef std::vector<Disk> DiskList; // Type for lists of extracted disks
-	typedef Misc::FunctionCall<const DiskList&> ExtractionResultCallback; // Type for functions to be called when disks have been extracted from a depth image
-	typedef Misc::FunctionCall<const Disk&> TrackingCallback; // Type for functions to be called with the blob containing a tracked pixel
+	typedef Threads::FunctionCall<const DiskList&> ExtractionResultCallback; // Type for functions to be called when disks have been extracted from a depth image
+	typedef Threads::FunctionCall<const Disk&> TrackingCallback; // Type for functions to be called with the blob containing a tracked pixel
 	
 	/* Forward declarations of embedded classes: */
 	struct DepthPCABlob;
@@ -96,9 +97,9 @@ class DiskExtractor
 	volatile bool keepProcessing; // Flag to shut down the disk extractor thread
 	FrameBuffer newFrame; // Buffer holding incoming depth image for disk extraction
 	Threads::Thread diskExtractorThread; // Background thread extracting disks from depth images
-	ExtractionResultCallback* extractionResultCallback; // Function called with disk extraction results
+	Misc::Autopointer<ExtractionResultCallback> extractionResultCallback; // Function called with disk extraction results
 	unsigned int trackingPixel; // Linear index of the tracking pixel
-	TrackingCallback* trackingCallback; // Function called with the disk containing a tracked pixel
+	Misc::Autopointer<TrackingCallback> trackingCallback; // Function called with the disk containing a tracked pixel
 	
 	/* Private methods: */
 	void createImagePoints(const FrameSource::IntrinsicParameters& ips); // Creates an array of image pixels with averaging weights
@@ -145,9 +146,9 @@ class DiskExtractor
 	void setDiskRadiusMargin(Scalar newDiskRadiusMargin); // Sets the maximum tolerance factor for disk radii
 	void setDiskFlatness(Scalar newDiskFlatness); // Sets the maximum along-axis extent of to-be-extracted disks
 	DiskList processFrame(const FrameBuffer& frame) const; // Immediately processes the given frame
-	void startStreaming(ExtractionResultCallback* newExtractionResultCallback); // Starts background processing; class takes ownership of new-allocated function object
+	void startStreaming(ExtractionResultCallback& newExtractionResultCallback); // Starts background processing
 	void stopStreaming(void); // Stops background processing
-	void startTracking(TrackingCallback* newTrackingCallback); // Starts tracking a specific pixel in the depth image
+	void startTracking(TrackingCallback& newTrackingCallback); // Starts tracking a specific pixel in the depth image
 	void setTrackingPixel(unsigned int trackingX,unsigned int trackingY); // Sets the pixel to be tracked
 	void stopTracking(void); // Stops pixel tracking
 	void submitFrame(const FrameBuffer& newNewFrame) // Holds the given depth image frame for disk extraction

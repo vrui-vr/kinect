@@ -1,7 +1,7 @@
 /***********************************************************************
 MultiplexedFrameSource - Class to stream several pairs of color and
 depth frames from a single source file or pipe.
-Copyright (c) 2010-2022 Oliver Kreylos
+Copyright (c) 2010-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -57,20 +57,17 @@ class MultiplexedFrameSource
 		IntrinsicParameters ips; // Stream's intrinsic camera parameters
 		ExtrinsicParameters eps; // Stream's extrinsic camera parameters
 		Threads::Spinlock streamingMutex; // Mutex protecing the stream's streaming state
-		bool streaming; // Flag whether this stream is currently streaming
-		StreamingCallback* colorStreamingCallback; // Callback to be called when a new color frame has been received
-		StreamingCallback* depthStreamingCallback; // Callback to be called when a new depth frame has been received
 		
 		/* Constructors and destructors: */
 		Stream(MultiplexedFrameSource* sOwner,unsigned int sIndex,IO::File& source); // Initializes stream by reading from given data source
 		virtual ~Stream(void); // Destroys the stream
 		
-		/* Methods from FrameSource: */
+		/* Methods from class FrameSource: */
 		virtual DepthCorrection* getDepthCorrectionParameters(void);
 		virtual IntrinsicParameters getIntrinsicParameters(void);
 		virtual ExtrinsicParameters getExtrinsicParameters(void);
 		virtual const Size& getActualFrameSize(int sensor) const;
-		virtual void startStreaming(StreamingCallback* newColorStreamingCallback,StreamingCallback* newDepthStreamingCallback);
+		virtual void startStreaming(void);
 		virtual void stopStreaming(void);
 		};
 	
