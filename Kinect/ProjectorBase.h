@@ -2,7 +2,7 @@
 ProjectorBase - Base class for different methods to project a depth
 frame captured from a Kinect camera back into calibrated 3D camera
 space, and texture-map it with a matching color frame.
-Copyright (c) 2010-2025 Oliver Kreylos
+Copyright (c) 2010-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -25,8 +25,12 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #ifndef KINECT_PROJECTORBASE_INCLUDED
 #define KINECT_PROJECTORBASE_INCLUDED
 
+#include <GL/gl.h>
 #include <Kinect/Types.h>
 #include <Kinect/FrameSource.h>
+
+/* Forward declarations: */
+class GLContextData;
 
 namespace Kinect {
 
@@ -42,6 +46,8 @@ class ProjectorBase
 	typedef PTransform::Point Point; // Type for points in depth image or world space
 	
 	/* Elements: */
+	protected:
+	Size colorSize; // Width and height of all incoming color frames
 	Size depthSize; // Width and height of all incoming depth frames
 	PixelCorrection* depthCorrection; // Buffer of per-pixel depth correction parameters
 	IntrinsicParameters intrinsicParameters; // Intrinsic parameters for the color and depth cameras
@@ -50,13 +56,24 @@ class ProjectorBase
 	FrameSource::ColorSpace colorSpace; // Color space of frame source's color stream
 	FrameSource::DepthPixel triangleDepthRange; // Maximum depth distance between a triangle's vertices
 	
+	/* Protected methods: */
+	GLenum getRgbInternalFormat(GLContextData& contextData) const; // Returns an appropriate internal texture format to store RGB textures in the given OpenGL context
+	
 	/* Constructors and destructors: */
 	public:
 	ProjectorBase(void); // Creates a base facade projector with uninitialized camera parameters
 	ProjectorBase(FrameSource& frameSource); // Creates a base facade projector for the given frame source
-	~ProjectorBase(void);
+	virtual ~ProjectorBase(void);
 	
 	/* Methods: */
+	const Size& getColorFrameSize(void) const // Returns the current color frame size
+		{
+		return colorSize;
+		}
+	unsigned int getColorFrameSize(int index) const // Ditto
+		{
+		return colorSize[index];
+		}
 	const Size& getDepthFrameSize(void) const // Returns the current depth frame size
 		{
 		return depthSize;
@@ -85,12 +102,13 @@ class ProjectorBase
 		{
 		return triangleDepthRange;
 		}
-	void setDepthFrameSize(const Size& newDepthFrameSize); // Sets the size of all future incoming depth frames
-	void setDepthCorrection(const FrameSource::DepthCorrection* dc); // Enables per-pixel depth correction using the given depth correction parameters
-	void setIntrinsicParameters(const FrameSource::IntrinsicParameters& ips); // Sets the projector's intrinsic camera parameters
-	void setExtrinsicParameters(const FrameSource::ExtrinsicParameters& eps); // Sets the projector's extrinsic camera parameters
-	void setColorSpace(const FrameSource::ColorSpace newColorSpace); // Sets the color stream's color space
-	void setTriangleDepthRange(FrameSource::DepthPixel newTriangleDepthRange); // Sets the maximum depth range for valid triangles
+	virtual void setColorFrameSize(const Size& newColorFrameSize); // Sets the size of all future incoming color frames
+	virtual void setDepthFrameSize(const Size& newDepthFrameSize); // Sets the size of all future incoming depth frames
+	virtual void setDepthCorrection(const FrameSource::DepthCorrection* dc); // Enables per-pixel depth correction using the given depth correction parameters
+	virtual void setIntrinsicParameters(const FrameSource::IntrinsicParameters& ips); // Sets the projector's intrinsic camera parameters
+	virtual void setExtrinsicParameters(const FrameSource::ExtrinsicParameters& eps); // Sets the projector's extrinsic camera parameters
+	virtual void setColorSpace(FrameSource::ColorSpace newColorSpace); // Sets the color stream's color space
+	virtual void setTriangleDepthRange(FrameSource::DepthPixel newTriangleDepthRange); // Sets the maximum depth range for valid triangles
 	Point projectPoint(const Point& p) const; // Projects a point from world space into depth image space
 	};
 

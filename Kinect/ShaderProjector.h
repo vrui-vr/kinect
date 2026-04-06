@@ -3,7 +3,7 @@ ShaderProjector - Class to project a depth frame captured from a Kinect
 camera back into calibrated 3D camera space, and texture-map it with a
 matching color frame using a custom shader to perform most processing on
 the GPU.
-Copyright (c) 2013-2025 Oliver Kreylos
+Copyright (c) 2013-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -75,11 +75,13 @@ class ShaderProjector:public ProjectorBase,public GLObject
 	ShaderProjector(void); // Creates a facade projector with uninitialized camera parameters
 	ShaderProjector(FrameSource& frameSource); // Creates a facade projector for the given frame source
 	
+	/* Methods from class ProjectorBase: */
+	virtual void setColorSpace(FrameSource::ColorSpace newColorSpace);
+	
 	/* Methods from class GLObject: */
 	virtual void initContext(GLContextData& contextData) const;
 	
 	/* New methods: */
-	void setColorSpace(FrameSource::ColorSpace newColorSpace); // Sets the color space of the frame source's color stream
 	void setDepthFrame(const FrameBuffer& newDepthFrame); // Updates the projector's current depth frame in streaming mode; can be called from any thread
 	void setColorFrame(const FrameBuffer& newColorFrame); // Updates the projector's current color frame in streaming mode; can be called from any thread
 	void updateFrames(void); // Selects the most recent depth and color frames for rendering; must be called from foreground thread

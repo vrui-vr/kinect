@@ -28,8 +28,8 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <GL/gl.h>
 #include <GL/GLMiscTemplates.h>
 #include <GL/GLVertexArrayParts.h>
-#include <GL/GLContextData.h>
 #include <GL/Extensions/GLARBVertexBufferObject.h>
+#include <GL/GLContextData.h>
 #include <GL/GLTransformationWrappers.h>
 
 namespace Kinect {
@@ -42,7 +42,7 @@ Projector::DataItem::DataItem(void)
 	:vertexBufferId(0),
 	 indexBufferId(0),
 	 meshVersion(0),
-	 textureId(0),
+	 colorTextureId(0),
 	 colorFrameVersion(0)
 	{
 	/* Check for vertex buffer object extension: */
@@ -57,7 +57,7 @@ Projector::DataItem::DataItem(void)
 		}
 	
 	/* Allocate texture object: */
-	glGenTextures(1,&textureId);
+	glGenTextures(1,&colorTextureId);
 	}
 
 Projector::DataItem::~DataItem(void)
@@ -69,7 +69,7 @@ Projector::DataItem::~DataItem(void)
 		glDeleteBuffersARB(1,&indexBufferId);
 	
 	/* Destroy texture object: */
-	glDeleteTextures(1,&textureId);
+	glDeleteTextures(1,&colorTextureId);
 	}
 
 /**********************************
@@ -161,6 +161,16 @@ void Projector::initContext(GLContextData& contextData) const
 		glBufferDataARB(GL_ELEMENT_ARRAY_BUFFER_ARB,size_t(depthSize[1]-1)*size_t(depthSize[0]-1)*2*3*sizeof(MeshBuffer::Index),0,GL_DYNAMIC_DRAW_ARB); // Worst-case index buffer size
 		glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB,0);
 		}
+	
+	/* Initialize the color texture: */
+	glBindTexture(GL_TEXTURE_2D,dataItem->colorTextureId);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_BASE_LEVEL,0);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAX_LEVEL,0);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+	glTexImage2D(GL_TEXTURE_2D,0,getRgbInternalFormat(contextData),colorSize,0,GL_RGB,GL_UNSIGNED_BYTE,0);
 	}
 
 void Projector::setDepthFrameSize(const Size& newDepthFrameSize)
@@ -649,7 +659,7 @@ void Projector::glRenderAction(GLContextData& contextData) const
 		}
 	
 	/* Bind the color texture object: */
-	glBindTexture(GL_TEXTURE_2D,dataItem->textureId);
+	glBindTexture(GL_TEXTURE_2D,dataItem->colorTextureId);
 	
 	/* Check if the cached color frame needs to be updated: */
 	if(dataItem->colorFrameVersion!=colorFrameVersion)
@@ -657,16 +667,8 @@ void Projector::glRenderAction(GLContextData& contextData) const
 		/* Get the currently locked color frame: */
 		const FrameBuffer& colorFrame=colorFrames.getLockedValue();
 		
-		/* Set up the texture parameters: */
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_BASE_LEVEL,0);
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAX_LEVEL,0);
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
-		
 		/* Upload the color texture image: */
-		glTexImage2D(GL_TEXTURE_2D,0,GL_RGB8,colorFrame.getSize(),0,GL_RGB,GL_UNSIGNED_BYTE,colorFrame.getData<GLubyte>());
+		glTexSubImage2D(GL_TEXTURE_2D,0,colorSize,GL_RGB,GL_UNSIGNED_BYTE,colorFrame.getData<GLubyte>());
 		
 		/* Mark the cached color frame as up-to-date: */
 		dataItem->colorFrameVersion=colorFrameVersion;

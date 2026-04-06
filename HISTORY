@@ -383,3 +383,10 @@ Kinect-6.0:
     - Removed callback parameters from startStreaming method
     - Added new setColorStreamingCallback, setDepthStreamingCallback,
       and setStreamingCallbacks methods.
+- Added initial support for Orbbec 3D cameras supported by the Orbbec
+  SDK (*not* Orbbec Astra SDK) via Kinect::CameraOrbbec.
+- Made most methods of Kinect::ProjectorBase virtual.
+- Added get/setColorFrameSize methods to Kinect::ProjectorBase, changed
+  all projector classes to use glTexSubImage when updating color frames.
+- Added getRgbInternalFormat method to Kinect::ProjectorBase to properly
+  handle gamma-corrected OpenGL contexts.

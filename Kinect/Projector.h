@@ -56,7 +56,7 @@ class Projector:public ProjectorBase,public GLObject
 		GLuint vertexBufferId; // ID of vertex buffer object holding the vertices of the current depth frame
 		GLuint indexBufferId; // ID of index buffer object holding the triangles of the current depth frame
 		unsigned int meshVersion; // Version number of mesh currently in vertex / index buffer
-		GLuint textureId; // ID of texture object holding the current color frame
+		GLuint colorTextureId; // ID of texture object holding the current color frame
 		unsigned int colorFrameVersion; // Version number of color currently in texture object
 		
 		/* Constructors and destructors: */
@@ -88,10 +88,10 @@ class Projector:public ProjectorBase,public GLObject
 	public:
 	Projector(void); // Creates a facade projector with uninitialized camera parameters
 	Projector(FrameSource& frameSource); // Creates a facade projector for the given frame source
-	~Projector(void);
+	virtual ~Projector(void);
 	
-	/* Overriden methods from class ProjectorBase: */
-	void setDepthFrameSize(const Size& newDepthFrameSize);
+	/* Methods from class ProjectorBase: */
+	virtual void setDepthFrameSize(const Size& newDepthFrameSize);
 	
 	/* Methods from class GLObject: */
 	virtual void initContext(GLContextData& contextData) const;

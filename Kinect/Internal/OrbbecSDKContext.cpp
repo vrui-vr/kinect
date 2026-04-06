@@ -1,7 +1,7 @@
 /***********************************************************************
 OrbbecSDKContext - Class to share Orbbec SDK context objects between
 multiple Orbbec cameras (as required by the API).
-Copyright (c) 2025 Oliver Kreylos
+Copyright (c) 2025-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -27,6 +27,9 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <libobsensor/hpp/Version.hpp>
 #include <libobsensor/hpp/Context.hpp>
 #include <Misc/MessageLogger.h>
+
+// DEBUGGING
+#include <iostream>
 
 namespace Kinect {
 
@@ -72,14 +75,24 @@ void OrbbecSDKContext::ref(void)
 	/* Increment the reference counter and check if it was zero before: */
 	if((refCount++)==0)
 		{
+		#if 1
+		
 		/* Print basic SDK info: */
-		Misc::formattedLogNote("Kinect::OrbbecSDKContext:: SDK version %d.%d.%d",ob::Version::getMajor(),ob::Version::getMinor(),ob::Version::getPatch());
-		Misc::formattedLogNote("Kinect::OrbbecSDKContext:: SDK stage version %d",ob::Version::getStageVersion());
+		Misc::formattedLogNote("Kinect::OrbbecSDKContext: SDK version %d.%d.%d",ob::Version::getMajor(),ob::Version::getMinor(),ob::Version::getPatch());
+		Misc::formattedLogNote("Kinect::OrbbecSDKContext: SDK stage version %d",ob::Version::getStageVersion());
+		
+		#endif
+		
+		// DEBUGGING
+		std::cout<<"Kinect::OrbbecSDKContext: Creating Orbbec SDK context"<<std::endl;
 		
 		/* Initialize the Orbbec SDK context: */
 		ob::Context::setLoggerSeverity(OB_LOG_SEVERITY_OFF);
 		ob::Context::setLoggerToCallback(OB_LOG_SEVERITY_WARN,std::bind(&OrbbecSDKContext::logCallback,this,std::placeholders::_1,std::placeholders::_2));
 		context=new ob::Context;
+		
+		// DEBUGGING
+		std::cout<<"Kinect::OrbbecSDKContext: Orbbec SDK context has been created"<<std::endl;
 		}
 	}
 
@@ -91,9 +104,15 @@ void OrbbecSDKContext::unref(void)
 	/* Decrement the reference counter and check if it reached zero: */
 	if((--refCount)==0)
 		{
+		// DEBUGGING
+		std::cout<<"Kinect::OrbbecSDKContext: Destroying Orbbec SDK context"<<std::endl;
+		
 		/* Destroy the Orbbec SDK context: */
 		delete context;
 		context=0;
+		
+		// DEBUGGING
+		std::cout<<"Kinect::OrbbecSDKContext: Orbbec SDK context has been destroyed"<<std::endl;
 		}
 	}
 
@@ -107,6 +126,11 @@ OrbbecSDKContextPtr OrbbecSDKContext::acquireContext(void)
 	{
 	/* Return an autopointer to the singleton Orbbec SDK context object; autopointer's call to ref() will set up context on first call: */
 	return OrbbecSDKContextPtr(&theContext);
+	}
+
+std::shared_ptr<ob::DeviceList> OrbbecSDKContext::queryDeviceList(void)
+	{
+	return context->queryDeviceList();
 	}
 
 }

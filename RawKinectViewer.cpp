@@ -35,7 +35,9 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Geometry/Ray.h>
 #include <Geometry/OrthogonalTransformation.h>
 #include <GL/gl.h>
+#include <GL/GLContext.h>
 #include <GL/Extensions/GLARBTextureNonPowerOfTwo.h>
+#include <GL/Extensions/GLEXTTextureSRGB.h>
 #include <GL/GLContextData.h>
 #include <Images/RGBImage.h>
 #include <Images/WriteImageFile.h>
@@ -1402,13 +1404,22 @@ void RawKinectViewer::initContext(GLContextData& contextData) const
 			}
 		}
 	
+	/* Determine an appropriate internal format for the color texture: */
+	GLenum colorInternalFormat=GL_RGB8;
+	if(contextData.getContext().isNonlinear())
+		{
+		/* Use a compressed internal storage format: */
+		GLEXTTextureSRGB::initExtension();
+		colorInternalFormat=GL_SRGB8_EXT;
+		}
+	
 	/* Prepare the depth texture: */
 	glBindTexture(GL_TEXTURE_2D,dataItem->depthTextureId);
 	glTexImage2D(GL_TEXTURE_2D,0,GL_RGB8,dataItem->depthTextureSize[0],dataItem->depthTextureSize[1],0,GL_RGB,GL_UNSIGNED_BYTE,0);
 	
 	/* Prepare the color texture: */
 	glBindTexture(GL_TEXTURE_2D,dataItem->colorTextureId);
-	glTexImage2D(GL_TEXTURE_2D,0,GL_RGB8,dataItem->colorTextureSize[0],dataItem->colorTextureSize[1],0,GL_RGB,GL_UNSIGNED_BYTE,0);
+	glTexImage2D(GL_TEXTURE_2D,0,colorInternalFormat,dataItem->colorTextureSize[0],dataItem->colorTextureSize[1],0,GL_RGB,GL_UNSIGNED_BYTE,0);
 	
 	/* Protect the texture images: */
 	glBindTexture(GL_TEXTURE_2D,0);

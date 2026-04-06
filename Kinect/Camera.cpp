@@ -1241,6 +1241,10 @@ FrameSource::DepthRange Camera::getDepthRange(void) const
 
 void Camera::startStreaming(void)
 	{
+	/* Throw an exception if already streaming: */
+	if(streaming)
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Already streaming");
+	
 	/* Open and prepare the device: */
 	device.open();
 	// device.setConfiguration(1); // This seems to confuse the device

@@ -3,7 +3,7 @@ ShaderProjector - Class to project a depth frame captured from a Kinect
 camera back into calibrated 3D camera space, and texture-map it with a
 matching color frame using a custom shader to perform most processing on
 the GPU.
-Copyright (c) 2013-2025 Oliver Kreylos
+Copyright (c) 2013-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -29,6 +29,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <IO/File.h>
 #include <IO/OpenFile.h>
 #include <GL/gl.h>
+#include <GL/GLMiscTemplates.h>
 #include <GL/GLVertexArrayParts.h>
 #include <GL/GLContextData.h>
 #include <GL/Extensions/GLARBFragmentShader.h>
@@ -193,6 +194,12 @@ ShaderProjector::ShaderProjector(FrameSource& frameSource)
 	GLObject::init();
 	}
 
+void ShaderProjector::setColorSpace(FrameSource::ColorSpace newColorSpace)
+	{
+	/* Call the base class method: */
+	ProjectorBase::setColorSpace(newColorSpace);
+	}
+
 void ShaderProjector::initContext(GLContextData& contextData) const
 	{
 	/* Create and register the data item: */
@@ -289,7 +296,7 @@ void ShaderProjector::initContext(GLContextData& contextData) const
 		glBindTexture(GL_TEXTURE_RECTANGLE_ARB,dataItem->depthCorrectionTextureId);
 		glTexParameteri(GL_TEXTURE_RECTANGLE_ARB,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_RECTANGLE_ARB,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
-		glTexImage2D(GL_TEXTURE_RECTANGLE_ARB,0,GL_RG32F,depthSize[0],depthSize[1],0,GL_RG,GL_FLOAT,depthCorrection);
+		glTexImage2D(GL_TEXTURE_RECTANGLE_ARB,0,GL_RG32F,depthSize,0,GL_RG,GL_FLOAT,depthCorrection);
 		glBindTexture(GL_TEXTURE_RECTANGLE_ARB,0);
 		}
 	
@@ -297,6 +304,7 @@ void ShaderProjector::initContext(GLContextData& contextData) const
 	glBindTexture(GL_TEXTURE_RECTANGLE_ARB,dataItem->depthTextureId);
 	glTexParameteri(GL_TEXTURE_RECTANGLE_ARB,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_RECTANGLE_ARB,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+	glTexImage2D(GL_TEXTURE_RECTANGLE_ARB,0,GL_R16UI,depthSize,0,GL_RED_INTEGER_EXT,GL_UNSIGNED_SHORT,0);
 	glBindTexture(GL_TEXTURE_RECTANGLE_ARB,0);
 	
 	/* Prepare the color frame texture: */
@@ -307,6 +315,7 @@ void ShaderProjector::initContext(GLContextData& contextData) const
 	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAX_LEVEL,0);
 	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+	glTexImage2D(GL_TEXTURE_2D,0,getRgbInternalFormat(contextData),colorSize,0,GL_RGB,GL_UNSIGNED_BYTE,0);
 	glBindTexture(GL_TEXTURE_2D,0);
 	
 	/* Build the initial version of the facade rendering shader: */
@@ -357,8 +366,7 @@ void ShaderProjector::glRenderAction(GLContextData& contextData) const
 		const FrameBuffer& depthFrame=depthFrames.getLockedValue();
 		
 		/* Upload the depth frame into the texture object: */
-		const GLushort* dfPtr=depthFrame.getData<GLushort>();
-		glTexImage2D(GL_TEXTURE_RECTANGLE_ARB,0,GL_R16UI,depthSize[0],depthSize[1],0,GL_RED_INTEGER_EXT,GL_UNSIGNED_SHORT,dfPtr);
+		glTexSubImage2D(GL_TEXTURE_RECTANGLE_ARB,0,depthSize,GL_RED_INTEGER_EXT,GL_UNSIGNED_SHORT,depthFrame.getData<GLushort>());
 		
 		/* Mark the cached depth frame as up-to-date: */
 		dataItem->depthFrameVersion=depthFrameVersion;
@@ -394,9 +402,7 @@ void ShaderProjector::glRenderAction(GLContextData& contextData) const
 		const FrameBuffer& colorFrame=colorFrames.getLockedValue();
 		
 		/* Upload the color frame into the texture object: */
-		const Size& size=colorFrame.getSize();
-		const GLubyte* cfPtr=colorFrame.getData<GLubyte>();
-		glTexImage2D(GL_TEXTURE_2D,0,GL_RGB8,size[0],size[1],0,GL_RGB,GL_UNSIGNED_BYTE,cfPtr);
+		glTexSubImage2D(GL_TEXTURE_2D,0,colorSize,GL_RGB,GL_UNSIGNED_BYTE,colorFrame.getData<GLubyte>());
 		
 		/* Mark the cached color frame as up-to-date: */
 		dataItem->colorFrameVersion=colorFrameVersion;

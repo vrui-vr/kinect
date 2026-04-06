@@ -30,6 +30,9 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Kinect/DirectFrameSource.h>
 
 /* Forward declarations: */
+namespace Video {
+class ImageExtractor;
+}
 namespace Kinect {
 class OrbbecSDKContext;
 typedef Misc::Autopointer<OrbbecSDKContext> OrbbecSDKContextPtr;
@@ -50,26 +53,31 @@ class CameraOrbbec:public DirectFrameSource
 	typedef Misc::UInt16 ObDepthPixel; // Type for raw depth values received from an Orbbec depth sensor
 	
 	/* Elements: */
+	static const char* pixelFormats[OB_FORMAT_UNKNOWN+1-OB_FORMAT_YUYV]; // List of video stream pixel formats defined by the Orbbec SDK, to automatically create color frame converters
 	OrbbecSDKContextPtr context; // Pointer to the Orbbec SDK context shared by all Orbbec cameras connected to the host
 	DevicePtr device; // The device from which to stream data
-	Size depthSize; // Requested size for streamed depth frames
-	Size colorSize; // Requested size for streamed color frames
+	Size frameSizes[2]; // Requested size for streamed color and depth frames, respectively
 	unsigned int fps; // Requested frame rate for depth and color frames
-	bool sensorsAcquired; // Flag if the selected camera's depth and color sensors have already been acquired
+	SensorPtr colorSensor; // The color sensor
+	VideoStreamProfilePtr colorProfile; // Profile of the color video stream
 	SensorPtr depthSensor; // The depth sensor
 	VideoStreamProfilePtr depthProfile; // Profile of the depth video stream
+	bool sensorsAcquired; // Flag if the selected camera's color and depth sensors have already been acquired
 	DepthPixel dMax; // Maximum valid depth pixel reported at FrameSource interface
 	float zRange[2]; // Range of valid depth values reported at the FrameSource interface in cm
 	float zQuant[2]; // Parameters for the depth quantization formula
-	SensorPtr colorSensor; // The color sensor
-	VideoStreamProfilePtr colorProfile; // Profile of the color video stream
+	Video::ImageExtractor* colorFrameExtractor; // Helper object to convert a raw color frame to RGB
 	
 	/* Private methods: */
 	void acquireSensors(void); // Acquires the selected Orbbec camera's depth and color sensors
 	static IntrinsicParameters::LensDistortion getLensDistortion(ob::VideoStreamProfile& profile); // Returns the lens distortion correction parameters of the given video stream profile
+	void colorFrameCallback(std::shared_ptr<ob::Frame> frame); // Callback called when the color sensor delivers a new frame
+	void depthFrameCallback(std::shared_ptr<ob::Frame> frame); // Callback called when the depth sensor delivers a new frame
+	void initialize(void); // Initializes the object after an Orbbec device has been selected
 	
 	/* Constructors and destructors: */
 	public:
+	static size_t getNumDevices(void); // Returns the number of Orbbec cameras connected to the host
 	CameraOrbbec(size_t index =0); // Opens the index-th Orbbec camera connected to the host
 	CameraOrbbec(const char* serialNumber); // Opens the Orbbec camera with the given serial number
 	virtual ~CameraOrbbec(void);
@@ -87,8 +95,6 @@ class CameraOrbbec:public DirectFrameSource
 	virtual void buildSettingsDialog(GLMotif::RowColumn* settingsDialog);
 	
 	/* New methods: */
-	void setDepthFrameSize(const Size& newDepthFrameSize); // Sets the depth frame size to be requested when streaming starts
-	void setColorFrameSize(const Size& newColorFrameSize); // Sets the color frame size to be requested when streaming starts
 	unsigned int getFps(void) const // Returns the requested frame rate
 		{
 		return fps;
@@ -97,7 +103,9 @@ class CameraOrbbec:public DirectFrameSource
 		{
 		return zRange;
 		}
-	void setFps(unsigned int newFps); // Sets the frame rate to be requested when streaming starts
+	void setColorFrameSize(const Size& newColorFrameSize); // Sets the color frame size to be requested when streaming starts; throws exception if called when already streaming
+	void setDepthFrameSize(const Size& newDepthFrameSize); // Sets the depth frame size to be requested when streaming starts; throws exception if called when already streaming
+	void setFps(unsigned int newFps); // Sets the frame rate to be requested when streaming starts; throws exception if called when already streaming
 	void setZRange(float zMin,float zMax); // Sets the limits of the reported quantized depth range in cm
 	};
 

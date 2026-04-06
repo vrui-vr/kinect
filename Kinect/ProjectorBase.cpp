@@ -24,7 +24,10 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 
 #include <Kinect/ProjectorBase.h>
 
-#include <Math/Math.h>
+#include <GL/gl.h>
+#include <GL/GLContext.h>
+#include <GL/Extensions/GLEXTTextureSRGB.h>
+#include <GL/GLContextData.h>
 
 namespace Kinect {
 
@@ -32,17 +35,31 @@ namespace Kinect {
 Methods of class ProjectorBase:
 ******************************/
 
+GLenum ProjectorBase::getRgbInternalFormat(GLContextData& contextData) const
+	{
+	/* Check if the given OpenGL context uses gamma-corrected rendering: */
+	if(contextData.getContext().isNonlinear())
+		{
+		/* Use a gamma-corrected internal storage format: */
+		GLEXTTextureSRGB::initExtension();
+		return GL_SRGB8_EXT;
+		}
+	else
+		{
+		/* Use a raw internal storage format: */
+		return GL_RGB8;
+		}
+	}
+
 ProjectorBase::ProjectorBase(void)
-	:depthSize(0,0),
-	 depthCorrection(0),colorSpace(FrameSource::RGB),
-	 triangleDepthRange(5)
+	:colorSize(0,0),depthSize(0,0),
+	 depthCorrection(0),colorSpace(FrameSource::RGB),triangleDepthRange(5)
 	{
 	}
 
 ProjectorBase::ProjectorBase(FrameSource& frameSource)
-	:depthSize(frameSource.getActualFrameSize(FrameSource::DEPTH)),
-	 depthCorrection(0),colorSpace(frameSource.getColorSpace()),
-	 triangleDepthRange(5)
+	:colorSize(frameSource.getActualFrameSize(FrameSource::COLOR)),depthSize(frameSource.getActualFrameSize(FrameSource::DEPTH)),
+	 depthCorrection(0),colorSpace(frameSource.getColorSpace()),triangleDepthRange(5)
 	{
 	/* Query the source's depth correction parameters and calculate the depth correction buffer: */
 	FrameSource::DepthCorrection* dc=frameSource.getDepthCorrectionParameters();
@@ -60,6 +77,12 @@ ProjectorBase::~ProjectorBase(void)
 	{
 	/* Release the depth correction buffer: */
 	delete[] depthCorrection;
+	}
+
+void ProjectorBase::setColorFrameSize(const Size& newColorFrameSize)
+	{
+	/* Copy the color frame size: */
+	colorSize=newColorFrameSize;
 	}
 
 void ProjectorBase::setDepthFrameSize(const Size& newDepthFrameSize)
@@ -101,7 +124,7 @@ void ProjectorBase::setExtrinsicParameters(const FrameSource::ExtrinsicParameter
 	worldDepthProjection*=intrinsicParameters.depthProjection;
 	}
 
-void ProjectorBase::setColorSpace(const FrameSource::ColorSpace newColorSpace)
+void ProjectorBase::setColorSpace(FrameSource::ColorSpace newColorSpace)
 	{
 	/* Replace the stored color space: */
 	colorSpace=newColorSpace;

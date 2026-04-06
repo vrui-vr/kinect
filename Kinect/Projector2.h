@@ -102,11 +102,11 @@ class Projector2:public ProjectorBase,public GLObject
 	public:
 	Projector2(void); // Creates a facade projector with uninitialized camera parameters
 	Projector2(FrameSource& frameSource); // Creates a facade projector for the given frame source
-	~Projector2(void);
+	virtual ~Projector2(void);
 	
-	/* Overriden methods from class ProjectorBase: */
-	void setDepthFrameSize(const Size& newDepthFrameSize);
-	void setColorSpace(const FrameSource::ColorSpace newColorSpace);
+	/* Methods from class ProjectorBase: */
+	virtual void setDepthFrameSize(const Size& newDepthFrameSize);
+	virtual void setColorSpace(FrameSource::ColorSpace newColorSpace);
 	
 	/* Methods from class GLObject: */
 	virtual void initContext(GLContextData& contextData) const;

@@ -1,7 +1,7 @@
 /***********************************************************************
 OrbbecSDKContext - Class to share Orbbec SDK context objects between
 multiple Orbbec cameras (as required by the API).
-Copyright (c) 2025 Oliver Kreylos
+Copyright (c) 2025-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -24,6 +24,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #ifndef KINECT_INTERNAL_ORBBECSDKCONTEXT_INCLUDED
 #define KINECT_INTERNAL_ORBBECSDKCONTEXT_INCLUDED
 
+#include <memory>
 #include <Misc/Autopointer.h>
 #include <Threads/Mutex.h>
 #include <libobsensor/h/ObTypes.h>
@@ -31,6 +32,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 /* Forward declarations: */
 namespace ob {
 class Context;
+class DeviceList;
 }
 
 namespace Kinect {
@@ -62,6 +64,7 @@ class OrbbecSDKContext
 	/* Methods: */
 	public:
 	static OrbbecSDKContextPtr acquireContext(void); // Returns a pointer to the singleton Orbbec SDK context; throws exception if context can not be initialized
+	std::shared_ptr<ob::DeviceList> queryDeviceList(void); // Returns the list of Orbbec devices connected to the host
 	};
 
 }

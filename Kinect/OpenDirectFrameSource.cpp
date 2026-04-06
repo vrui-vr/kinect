@@ -1,7 +1,7 @@
 /***********************************************************************
 OpenDirectFrameSource - Helper functions to open a 3D camera by index or
 serial number without having to know its type.
-Copyright (c) 2016-2024 Oliver Kreylos
+Copyright (c) 2016-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -30,6 +30,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Kinect/Camera.h>
 #include <Kinect/CameraV2.h>
 #include <Kinect/CameraRealSense.h>
+#include <Kinect/CameraOrbbec.h>
 
 namespace Kinect {
 
@@ -75,6 +76,15 @@ DirectFrameSource* openDirectFrameSource(unsigned int index,bool forceRgb)
 		}
 	searchIndex-=numRealSenses;
 	
+	/* Get the number of Orbbec cameras: */
+	size_t numOrbbecs=CameraOrbbec::getNumDevices();
+	if(searchIndex<numOrbbecs)
+		{
+		/* Return the Orbbec camera of the given index: */
+		return new CameraOrbbec(searchIndex);
+		}
+	searchIndex-=numOrbbecs;
+	
 	/* Not enough cameras: */
 	throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Fewer than %u 3D cameras connected to local host",index+1);
 	}
@@ -104,6 +114,11 @@ DirectFrameSource* openDirectFrameSource(const char* serialNumber,bool forceRgb)
 			{
 			/* Look for an Intel RealSense camera: */
 			return new CameraRealSense(snPtr+1);
+			}
+		else if(snPtr-serialNumber==2&&strncasecmp(serialNumber,"OB",2)==0)
+			{
+			/* Look for an Orbbec camera: */
+			return new CameraOrbbec(snPtr+1);
 			}
 		else
 			throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Unsupported 3D camera type \"%s\"",std::string(serialNumber,snPtr).c_str());

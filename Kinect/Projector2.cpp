@@ -455,6 +455,53 @@ Projector2::~Projector2(void)
 	delete[] spatialFilterBuffer;
 	}
 
+void Projector2::setDepthFrameSize(const Size& newDepthFrameSize)
+	{
+	/* Call the base class method: */
+	ProjectorBase::setDepthFrameSize(newDepthFrameSize);
+	
+	/*********************************************************************
+	Initialize the quad case vertex offset table:
+	*********************************************************************/
+	
+	/* Case 0x7 - triangle in lower-left corner of quad: */
+	quadCaseVertexOffsets[0x7][0]=0;
+	quadCaseVertexOffsets[0x7][1]=1;
+	quadCaseVertexOffsets[0x7][2]=depthSize[0];
+	
+	/* Case 0xb - triangle in lower-right corner of quad: */
+	quadCaseVertexOffsets[0xb][0]=0;
+	quadCaseVertexOffsets[0xb][1]=1;
+	quadCaseVertexOffsets[0xb][2]=depthSize[0]+1;
+	
+	/* Case 0xd - triangle in upper-left corner of quad: */
+	quadCaseVertexOffsets[0xd][0]=0;
+	quadCaseVertexOffsets[0xd][1]=depthSize[0];
+	quadCaseVertexOffsets[0xd][2]=depthSize[0]+1;
+	
+	/* Case 0xe - triangle in upper-right corner of quad: */
+	quadCaseVertexOffsets[0xe][0]=1;
+	quadCaseVertexOffsets[0xe][1]=depthSize[0];
+	quadCaseVertexOffsets[0xe][2]=depthSize[0]+1;
+	
+	/* Case 0xf - two triangles in quad, split into lower-left and upper-right: */
+	quadCaseVertexOffsets[0xf][0]=0;
+	quadCaseVertexOffsets[0xf][1]=1;
+	quadCaseVertexOffsets[0xf][2]=depthSize[0];
+	quadCaseVertexOffsets[0xf][3]=depthSize[0];
+	quadCaseVertexOffsets[0xf][4]=1;
+	quadCaseVertexOffsets[0xf][5]=depthSize[0]+1;
+	}
+
+void Projector2::setColorSpace(FrameSource::ColorSpace newColorSpace)
+	{
+	/* Call the base class method: */
+	ProjectorBase::setColorSpace(newColorSpace);
+	
+	/* Invalidate the rendering shader: */
+	++renderingShaderSettingsVersion;
+	}
+
 void Projector2::initContext(GLContextData& contextData) const
 	{
 	/* Create and register the data item: */
@@ -525,6 +572,7 @@ void Projector2::initContext(GLContextData& contextData) const
 	glTexParameteri(GL_TEXTURE_RECTANGLE_ARB,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_RECTANGLE_ARB,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_RECTANGLE_ARB,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+	glTexImage2D(GL_TEXTURE_RECTANGLE_ARB,0,GL_R16UI,depthSize,0,GL_RED_INTEGER_EXT,GL_UNSIGNED_SHORT,0);
 	glBindTexture(GL_TEXTURE_RECTANGLE_ARB,0);
 	
 	/* Prepare the color frame texture: */
@@ -535,54 +583,11 @@ void Projector2::initContext(GLContextData& contextData) const
 	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+	if(colorSpace==FrameSource::RGB)
+		glTexImage2D(GL_TEXTURE_2D,0,getRgbInternalFormat(contextData),colorSize,0,GL_RGB,GL_UNSIGNED_BYTE,0);
+	else
+		glTexImage2D(GL_TEXTURE_2D,0,GL_RGB8,colorSize,0,GL_RGB,GL_UNSIGNED_BYTE,0);
 	glBindTexture(GL_TEXTURE_2D,0);
-	}
-
-void Projector2::setDepthFrameSize(const Size& newDepthFrameSize)
-	{
-	/* Call the base class method: */
-	ProjectorBase::setDepthFrameSize(newDepthFrameSize);
-	
-	/*********************************************************************
-	Initialize the quad case vertex offset table:
-	*********************************************************************/
-	
-	/* Case 0x7 - triangle in lower-left corner of quad: */
-	quadCaseVertexOffsets[0x7][0]=0;
-	quadCaseVertexOffsets[0x7][1]=1;
-	quadCaseVertexOffsets[0x7][2]=depthSize[0];
-	
-	/* Case 0xb - triangle in lower-right corner of quad: */
-	quadCaseVertexOffsets[0xb][0]=0;
-	quadCaseVertexOffsets[0xb][1]=1;
-	quadCaseVertexOffsets[0xb][2]=depthSize[0]+1;
-	
-	/* Case 0xd - triangle in upper-left corner of quad: */
-	quadCaseVertexOffsets[0xd][0]=0;
-	quadCaseVertexOffsets[0xd][1]=depthSize[0];
-	quadCaseVertexOffsets[0xd][2]=depthSize[0]+1;
-	
-	/* Case 0xe - triangle in upper-right corner of quad: */
-	quadCaseVertexOffsets[0xe][0]=1;
-	quadCaseVertexOffsets[0xe][1]=depthSize[0];
-	quadCaseVertexOffsets[0xe][2]=depthSize[0]+1;
-	
-	/* Case 0xf - two triangles in quad, split into lower-left and upper-right: */
-	quadCaseVertexOffsets[0xf][0]=0;
-	quadCaseVertexOffsets[0xf][1]=1;
-	quadCaseVertexOffsets[0xf][2]=depthSize[0];
-	quadCaseVertexOffsets[0xf][3]=depthSize[0];
-	quadCaseVertexOffsets[0xf][4]=1;
-	quadCaseVertexOffsets[0xf][5]=depthSize[0]+1;
-	}
-
-void Projector2::setColorSpace(FrameSource::ColorSpace newColorSpace)
-	{
-	/* Call the base class method: */
-	ProjectorBase::setColorSpace(newColorSpace);
-	
-	/* Invalidate the rendering shader: */
-	++renderingShaderSettingsVersion;
 	}
 
 Projector2::Point Projector2::unprojectPixel(unsigned int x,unsigned int y) const
@@ -1035,8 +1040,7 @@ void Projector2::glRenderAction(GLContextData& contextData) const
 		const FrameBuffer& depthFrame=meshes.getLockedValue().first;
 		
 		/* Upload the depth frame into the texture object: */
-		const GLushort* dfPtr=depthFrame.getData<GLushort>();
-		glTexImage2D(GL_TEXTURE_RECTANGLE_ARB,0,GL_R16UI,depthSize,0,GL_RED_INTEGER_EXT,GL_UNSIGNED_SHORT,dfPtr);
+		glTexSubImage2D(GL_TEXTURE_RECTANGLE_ARB,0,depthSize,GL_RED_INTEGER_EXT,GL_UNSIGNED_SHORT,depthFrame.getData<GLushort>());
 		
 		/* Load the mesh's triangle indices into the index buffer object: */
 		glBufferSubDataARB(GL_ELEMENT_ARRAY_BUFFER_ARB,0,mesh.numTriangles*3*sizeof(MeshBuffer::Index),mesh.getTriangleIndices());
@@ -1109,7 +1113,7 @@ void Projector2::glRenderAction(GLContextData& contextData) const
 			const FrameBuffer& colorFrame=colorFrames.getLockedValue();
 			
 			/* Upload the color frame into the texture object: */
-			glTexImage2D(GL_TEXTURE_2D,0,GL_RGB8,colorFrame.getSize(),0,GL_RGB,GL_UNSIGNED_BYTE,colorFrame.getData<GLubyte>());
+			glTexSubImage2D(GL_TEXTURE_2D,0,colorSize,GL_RGB,GL_UNSIGNED_BYTE,colorFrame.getData<GLubyte>());
 			
 			/* Mark the cached color frame as up-to-date: */
 			dataItem->colorFrameVersion=colorFrameVersion;

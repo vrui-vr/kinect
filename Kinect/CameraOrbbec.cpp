@@ -24,10 +24,29 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Kinect/CameraOrbbec.h>
 
 #include <Misc/StdError.h>
+#include <Misc/StandardValueCoders.h>
+#include <Misc/ArrayValueCoders.h>
+#include <Misc/ConfigurationFile.h>
 #include <Threads/FunctionCalls.h>
+#include <Math/Math.h>
+#include <Video/VideoDataFormat.h>
+#include <Video/FrameBuffer.h>
+#include <Video/ImageExtractor.h>
+#include <Kinect/FrameBuffer.h>
 #include <Kinect/Internal/OrbbecSDKContext.h>
 
 namespace Kinect {
+
+/*************************************
+Static elements of class CameraOrbbec:
+*************************************/
+
+const char* CameraOrbbec::pixelFormats[OB_FORMAT_UNKNOWN+1-OB_FORMAT_YUYV]=
+	{
+	"YUYV","YUY2","UYVY","NV12","NV21","MJPG","H264","H265","Y16","Y8","Y10","Y12","GRAY","HEVC","I420",
+	"ACCL","GYRO","PNT ","RGBP","RLE","RGB","BGR","Y14","BGRA","COMP","RVL","Z16","YV12","BA81",
+	"RGBA","BYR2","RW16","DS16","UNKNOWN"
+	};
 
 /*****************************
 Methods of class CameraOrbbec:
@@ -37,44 +56,6 @@ void CameraOrbbec::acquireSensors(void)
 	{
 	/* Retrieve the list of sensors on the selected device: */
 	std::shared_ptr<ob::SensorList> sensorList=device->getSensorList();
-	
-	/* Find the device's depth sensor: */
-	for(unsigned int sensorIndex=0;sensorIndex<sensorList->count();++sensorIndex)
-		{
-		/* Get the i-th sensor: */
-		SensorPtr sensor=sensorList->getSensor(sensorIndex);
-		if(sensor->type()==OB_SENSOR_DEPTH)
-			{
-			depthSensor=sensor;
-			break;
-			}
-		}
-	if(depthSensor==0)
-		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Selected device does not have depth sensor");
-	
-	/* Find a matching stream profiles: */
-	const std::shared_ptr<ob::StreamProfileList> dspList=depthSensor->getStreamProfileList();
-	for(unsigned int streamProfileIndex=0;streamProfileIndex<dspList->count();++streamProfileIndex)
-		{
-		try
-			{
-			/* Get the i-th stream profile and check whether it's a video stream profile: */
-			VideoStreamProfilePtr vsp=dspList->getProfile(streamProfileIndex)->as<ob::VideoStreamProfile>();
-			
-			/* Check if the profile matches: */
-			if(vsp->type()==OB_STREAM_DEPTH&&vsp->width()==depthSize[0]&&vsp->height()==depthSize[1]&&vsp->fps()==fps)
-				{
-				depthProfile=vsp;
-				break;
-				}
-			}
-		catch(const std::runtime_error&)
-			{
-			/* Ignore the error and carry on... */
-			}
-		}
-	if(depthProfile==0)
-		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"No depth stream profile matching %ux%u@%uHz found",depthSize[0],depthSize[1],fps);
 	
 	/* Find the device's color sensor: */
 	for(unsigned int sensorIndex=0;sensorIndex<sensorList->count();++sensorIndex)
@@ -90,7 +71,7 @@ void CameraOrbbec::acquireSensors(void)
 	if(colorSensor==0)
 		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Selected device does not have color sensor");
 	
-	/* Find a matching stream profiles: */
+	/* Find a matching stream profile: */
 	const std::shared_ptr<ob::StreamProfileList> cspList=colorSensor->getStreamProfileList();
 	for(unsigned int streamProfileIndex=0;streamProfileIndex<cspList->count();++streamProfileIndex)
 		{
@@ -100,7 +81,7 @@ void CameraOrbbec::acquireSensors(void)
 			VideoStreamProfilePtr vsp=cspList->getProfile(streamProfileIndex)->as<ob::VideoStreamProfile>();
 			
 			/* Check if the profile matches: */
-			if(vsp->type()==OB_STREAM_COLOR&&vsp->width()==colorSize[0]&&vsp->height()==colorSize[1]&&vsp->fps()==fps)
+			if(vsp->type()==OB_STREAM_COLOR&&vsp->width()==frameSizes[0][0]&&vsp->height()==frameSizes[0][1]&&vsp->fps()==fps)
 				{
 				colorProfile=vsp;
 				break;
@@ -112,7 +93,45 @@ void CameraOrbbec::acquireSensors(void)
 			}
 		}
 	if(colorProfile==0)
-		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"No color stream profile matching %ux%u@%uHz found",colorSize[0],colorSize[1],fps);
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"No color stream profile matching %ux%u@%uHz found",frameSizes[0][0],frameSizes[0][1],fps);
+	
+	/* Find the device's depth sensor: */
+	for(unsigned int sensorIndex=0;sensorIndex<sensorList->count();++sensorIndex)
+		{
+		/* Get the i-th sensor: */
+		SensorPtr sensor=sensorList->getSensor(sensorIndex);
+		if(sensor->type()==OB_SENSOR_DEPTH)
+			{
+			depthSensor=sensor;
+			break;
+			}
+		}
+	if(depthSensor==0)
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Selected device does not have depth sensor");
+	
+	/* Find a matching stream profile: */
+	const std::shared_ptr<ob::StreamProfileList> dspList=depthSensor->getStreamProfileList();
+	for(unsigned int streamProfileIndex=0;streamProfileIndex<dspList->count();++streamProfileIndex)
+		{
+		try
+			{
+			/* Get the i-th stream profile and check whether it's a video stream profile: */
+			VideoStreamProfilePtr vsp=dspList->getProfile(streamProfileIndex)->as<ob::VideoStreamProfile>();
+			
+			/* Check if the profile matches: */
+			if(vsp->type()==OB_STREAM_DEPTH&&vsp->width()==frameSizes[1][0]&&vsp->height()==frameSizes[1][1]&&vsp->fps()==fps)
+				{
+				depthProfile=vsp;
+				break;
+				}
+			}
+		catch(const std::runtime_error&)
+			{
+			/* Ignore the error and carry on... */
+			}
+		}
+	if(depthProfile==0)
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"No depth stream profile matching %ux%u@%uHz found",frameSizes[1][0],frameSizes[1][1],fps);
 	
 	/* Mark the sensors as acquired: */
 	sensorsAcquired=true;
@@ -131,17 +150,98 @@ FrameSource::IntrinsicParameters::LensDistortion CameraOrbbec::getLensDistortion
 	result.setKappa(3,distortion.k4);
 	result.setKappa(4,distortion.k5);
 	result.setKappa(5,distortion.k6);
-	result.setRho(0,distortion.p1);
+	result.setRho(0,-distortion.p1); // Negate this because we flip depth and color frames vertically upon decoding
 	result.setRho(1,distortion.p2);
 	
 	return result;
 	}
 
+void CameraOrbbec::colorFrameCallback(std::shared_ptr<ob::Frame> frame)
+	{
+	/* Sample the timer: */
+	Time now;
+	
+	/*********************************************************************
+	This is where we would synchronize clocks to account for random OS
+	delays, subtract expected hardware latency, etc. pp.
+	*********************************************************************/
+	
+	/* Allocate a frame buffer and extract an RGB image from the color frame: */
+	FrameBuffer colorFrame(frameSizes[0],frameSizes[0].volume()*sizeof(FrameSource::ColorPixel));
+	colorFrame.timeStamp=double(now-timeBase);
+	Video::FrameBuffer frameBuffer;
+	frameBuffer.start=static_cast<unsigned char*>(frame->data());
+	frameBuffer.used=frameBuffer.size=frame->dataSize();
+	colorFrameExtractor->extractRGB(&frameBuffer,colorFrame.getData<FrameSource::ColorPixel>());
+	
+	/* Call the color streaming callback with the extracted frame: */
+	(*colorStreamingCallback)(colorFrame);
+	}
+
+void CameraOrbbec::depthFrameCallback(std::shared_ptr<ob::Frame> frame)
+	{
+	/* Sample the timer: */
+	Time now;
+	
+	/*********************************************************************
+	This is where we would synchronize clocks to account for random OS
+	delays, subtract expected hardware latency, etc. pp.
+	*********************************************************************/
+	
+	/* Calculate depth quantization coefficients based on the selected Z value range in cm and the frame's raw depth value scale: */
+	DepthFramePtr dFrame=frame->as<ob::DepthFrame>();
+	float depthScale=dFrame->getValueScale(); // Scale factor from raw integer depth values to Z values in mm
+	float b=float(dMax)*zRange[1]/(zRange[1]-zRange[0]);
+	float a=b*zRange[0]*10.0f/depthScale;
+	
+	/* Calculate the valid range of raw depth values: */
+	ObDepthPixel min(Math::ceil(zRange[0]*10.0f/depthScale));
+	ObDepthPixel max(Math::floor(zRange[1]*10.0f/depthScale));
+	
+	/* Allocate a frame buffer and quantize and flip the depth frame: */
+	FrameBuffer depthFrame(frameSizes[1],frameSizes[1].volume()*sizeof(FrameSource::DepthPixel));
+	depthFrame.timeStamp=double(now-timeBase);
+	const ObDepthPixel* sRowPtr=static_cast<const ObDepthPixel*>(dFrame->data())+(frameSizes[1][1]-1)*frameSizes[1][0];
+	FrameSource::DepthPixel* dPtr=depthFrame.getData<FrameSource::DepthPixel>();
+	for(unsigned int y=0;y<frameSizes[1][1];++y,sRowPtr-=frameSizes[1][0])
+		{
+		const ObDepthPixel* sPtr=sRowPtr;
+		for(unsigned int x=0;x<frameSizes[1][0];++x,++sPtr,++dPtr)
+			*dPtr=*sPtr>=min&&*sPtr<=max?FrameSource::DepthPixel(b-a/float(*sPtr)+0.5f):FrameSource::invalidDepth;
+		}
+	
+	/* Call the depth streaming callback with the quantized frame: */
+	(*depthStreamingCallback)(depthFrame);
+	}
+
+void CameraOrbbec::initialize(void)
+	{
+	/* Set the default color and depth streaming formats: */
+	// frameSizes[0]=Size(1920,1080);
+	frameSizes[0]=Size(3840,2160);
+	frameSizes[1]=Size(640,576);
+	fps=30;
+	
+	/* Set the maximum valid depth pixel value: */
+	dMax=FrameSource::invalidDepth-1;
+	
+	/* Set a default Z range: */
+	setZRange(50.0f,386.0f); // Values from Orbbec Femto Bolt datasheet
+	}
+
+size_t CameraOrbbec::getNumDevices(void)
+	{
+	/* Acquire an Orbbec SDK context: */
+	OrbbecSDKContextPtr context(OrbbecSDKContext::acquireContext());
+	
+	/* Retrieve the list of Orbbec devices and return the number of devices: */
+	return context->queryDeviceList()->deviceCount();
+	}
+
 CameraOrbbec::CameraOrbbec(size_t index)
 	:context(OrbbecSDKContext::acquireContext()),
-	 depthSize(640,576),colorSize(1920,1080),fps(30),
 	 sensorsAcquired(false),
-	 dMax(FrameSource::invalidDepth-1)
+	 colorFrameExtractor(0)
 	{
 	/* Request the list of all connected Orbbec cameras: */
 	std::shared_ptr<ob::DeviceList> devList=context->queryDeviceList();
@@ -151,15 +251,14 @@ CameraOrbbec::CameraOrbbec(size_t index)
 	/* Acquire the requested device: */
 	device=devList->getDevice(index);
 	
-	/* Initialize the depth quantization formulas: */
-	setZRange(25.0f,400.0f);
+	/* Initialize the requested device: */
+	initialize();
 	}
 
 CameraOrbbec::CameraOrbbec(const char* serialNumber)
 	:context(OrbbecSDKContext::acquireContext()),
-	 depthSize(640,576),colorSize(1920,1080),fps(30),
 	 sensorsAcquired(false),
-	 dMax(FrameSource::invalidDepth-1)
+	 colorFrameExtractor(0)
 	{
 	/* Request the list of all connected Orbbec cameras: */
 	std::shared_ptr<ob::DeviceList> devList=context->queryDeviceList();
@@ -167,12 +266,26 @@ CameraOrbbec::CameraOrbbec(const char* serialNumber)
 	/* Acquire the camera with the requested serial number: */
 	device=devList->getDeviceBySN(serialNumber);
 	
-	/* Initialize the depth quantization formulas: */
-	setZRange(25.0f,400.0f);
+	/* Initialize the requested device: */
+	initialize();
 	}
 
 CameraOrbbec::~CameraOrbbec(void)
 	{
+	/* Stop streaming, just in case: */
+	stopStreaming();
+	
+	/* Release the sensors if they have been acquired: */
+	if(sensorsAcquired)
+		{
+		depthProfile=0;
+		depthSensor=0;
+		colorProfile=0;
+		colorSensor=0;
+		}
+	
+	/* Release the acquired device: */
+	device=0;
 	}
 
 FrameSource::DepthCorrection* CameraOrbbec::getDepthCorrectionParameters(void)
@@ -183,7 +296,7 @@ FrameSource::DepthCorrection* CameraOrbbec::getDepthCorrectionParameters(void)
 
 FrameSource::IntrinsicParameters CameraOrbbec::getIntrinsicParameters(void)
 	{
-	FrameSource::IntrinsicParameters result;
+	IntrinsicParameters result;
 	
 	/* Acquire the camera's sensors to query intrinsic parameters: */
 	if(!sensorsAcquired)
@@ -196,13 +309,17 @@ FrameSource::IntrinsicParameters CameraOrbbec::getIntrinsicParameters(void)
 	IntrinsicParameters::PTransform::Matrix& dMat=result.depthProjection.getMatrix();
 	dMat=IntrinsicParameters::PTransform::Matrix::zero;
 	OBCameraIntrinsic depthIntrinsics=depthProfile->getIntrinsic();
-	dMat(0,0)=-1.0/depthIntrinsics.fx;
-	dMat(0,3)=depthIntrinsics.cx/depthIntrinsics.fx;
-	dMat(1,1)=-1.0/depthIntrinsics.fy;
-	dMat(1,3)=depthIntrinsics.cy/depthIntrinsics.fy;
+	
+	dMat(0,0)=1.0/depthIntrinsics.fx;
+	dMat(0,3)=-(depthIntrinsics.cx+0.5)/depthIntrinsics.fx; // Add 0.5 because Orbbec SDK assumes pixels at integer positions
+	dMat(1,1)=1.0/depthIntrinsics.fy;
+	dMat(1,3)=-(double(frameSizes[1][1])-depthIntrinsics.cy+0.5)/depthIntrinsics.fy; // Invert because we flip the depth frame, and add 0.5 because see above
 	dMat(2,3)=-1.0;
-	dMat(3,2)=-1.0/double(zQuant[0]);
-	dMat(3,3)=double(zQuant[1])/double(zQuant[0]);
+	double b=double(dMax)*double(zRange[1])/(double(zRange[1])-double(zRange[0]));
+	double a=b*double(zRange[0]);
+	
+	dMat(3,2)=-1.0/a;
+	dMat(3,3)=b/a;
 	
 	/* Retrieve the color sensor's lens distortion correction coefficients: */
 	result.colorLensDistortion=getLensDistortion(*colorProfile);
@@ -211,364 +328,159 @@ FrameSource::IntrinsicParameters CameraOrbbec::getIntrinsicParameters(void)
 	IntrinsicParameters::PTransform::Matrix& cMat=result.colorProjection.getMatrix();
 	cMat=IntrinsicParameters::PTransform::Matrix::zero;
 	OBCameraIntrinsic colorIntrinsics=colorProfile->getIntrinsic();
-	cMat(0,0)=IntrinsicParameters::Scalar(colorIntrinsics.fx);
 	
+	cMat(0,0)=-colorIntrinsics.fx/double(frameSizes[0][0]);
+	cMat(0,2)=(colorIntrinsics.cx+0.5)/double(frameSizes[0][0]); // Add 0.5 because Orbbec SDK assumes pixels at integer positions
+	cMat(1,1)=-colorIntrinsics.fy/double(frameSizes[0][1]);
+	cMat(1,2)=1.0-(colorIntrinsics.cy+0.5)/double(frameSizes[0][1]); // Invert because we flip the color frame, and add 0.5 because see above
+	cMat(2,3)=-1.0;
+	cMat(3,2)=1.0;
 	
-	
-	
-	colorIntrinsic[0]=-intrinsic.fx;
-	colorIntrinsic[1]=float(intrinsic.width)-intrinsic.cx;
-	colorIntrinsic[2]=-intrinsic.fy;
-	colorIntrinsic[3]=float(intrinsic.height)-intrinsic.cy;
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	/* Query the camera's intrinsic parameters: */
-	rs_error* error=0;
-	rs_intrinsics colorIntrinsics,depthIntrinsics;
-	if(error==0)
-		rs_get_stream_intrinsics(device,RS_STREAM_COLOR,&colorIntrinsics,&error);
-	if(error==0)
-		rs_get_stream_intrinsics(device,RS_STREAM_DEPTH,&depthIntrinsics,&error);
-	rs_extrinsics extrinsics; // Still an intrinsic parameter
-	if(error==0)
-		rs_get_device_extrinsics(device,RS_STREAM_DEPTH,RS_STREAM_COLOR,&extrinsics,&error);
-	if(error!=0)
-		{
-		/* Throw an exception: */
-		std::runtime_error exception(Misc::makeStdErrMsg(__PRETTY_FUNCTION__,"Error %s while querying camera intrinsics",rs_get_error_message(error)));
-		rs_free_error(error);
-		throw exception;
-		}
-	
-	IntrinsicParameters result;
-	
-	typedef IntrinsicParameters::PTransform PTransform;
-	
-	/* Calculate the un-projection matrix from 3D depth image space into 3D camera space: */
-	PTransform::Matrix& dum=result.depthProjection.getMatrix();
-	dum=PTransform::Matrix::zero;
-	dum(0,0)=-1.0/double(depthIntrinsics.fx);
-	dum(0,3)=double(depthIntrinsics.ppx)/double(depthIntrinsics.fx);
-	dum(1,1)=-1.0/double(depthIntrinsics.fy);
-	dum(1,3)=(double(depthIntrinsics.height)-double(depthIntrinsics.ppy))/double(depthIntrinsics.fy);
-	dum(2,3)=-1.0;
-	dum(3,2)=-1.0/double(a);
-	dum(3,3)=double(b)/double(a);
-	
-	/* Scale the depth unprojection matrix to cm: */
-	result.depthProjection.leftMultiply(PTransform::scale(0.1));
-	
-	/* Calculate the texture projection matrix from 3D camera space into 2D color camera texture space: */
-	PTransform::Matrix& cpm=result.colorProjection.getMatrix();
-	cpm=PTransform::Matrix::zero;
-	cpm(0,0)=double(colorIntrinsics.fx)/double(colorIntrinsics.width);
-	cpm(0,2)=double(colorIntrinsics.ppx)/double(colorIntrinsics.width);
-	cpm(1,1)=-double(colorIntrinsics.fy)/double(colorIntrinsics.height);
-	cpm(1,2)=(double(colorIntrinsics.height)-double(colorIntrinsics.ppy))/double(colorIntrinsics.height);
-	cpm(2,3)=1.0;
-	cpm(3,2)=1.0;
-	
-	/* Calculate an affine transformation from 3D depth camera space into 3D color camera space: */
-	PTransform extrinsicTransform=PTransform::identity;
-	PTransform::Matrix& etm=extrinsicTransform.getMatrix();
+	/* Retrieve the transformation from depth sensor space to color sensor space: */
+	OBExtrinsic ext=depthProfile->getExtrinsicTo(colorProfile);
+	IntrinsicParameters::PTransform depthToColor=IntrinsicParameters::PTransform::identity;
+	IntrinsicParameters::PTransform::Matrix& dtcMat=depthToColor.getMatrix();
 	for(int i=0;i<3;++i)
 		{
 		for(int j=0;j<3;++j)
-			etm(i,j)=double(extrinsics.rotation[i+j*3]);
-		etm(i,3)=double(extrinsics.translation[i]);
+			dtcMat(i,j)=ext.rot[i*3+j];
+		dtcMat(i,3)=ext.trans[i]/10.0;
 		}
-	result.colorProjection*=extrinsicTransform;
-	
-	/* Scale 3D depth camera space from cm to m: */
-	result.colorProjection*=PTransform::scale(PTransform::Scale(-0.01,0.01,-0.01));
+	result.colorProjection*=depthToColor;
 	
 	/* Concatenate the depth un-projection matrix to transform directly from depth image space to color image space: */
 	result.colorProjection*=result.depthProjection;
 	
+	/* Update the intrinsic transformations: */
+	result.updateTransforms();
+	
 	return result;
 	}
 
-const Size& CameraRealSense::getActualFrameSize(int sensor) const
+const Size& CameraOrbbec::getActualFrameSize(int sensor) const
 	{
+	/* Return the requested frame size for the given sensor: */
 	return frameSizes[sensor];
 	}
 
-void CameraRealSense::startStreaming(FrameSource::StreamingCallback* newColorStreamingCallback,FrameSource::StreamingCallback* newDepthStreamingCallback)
+void CameraOrbbec::startStreaming(void)
 	{
 	/* Throw an exception if already streaming: */
-	if(runStreamingThread)
-		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"RealSense device is already streaming");
+	if(streaming)
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Already streaming");
 	
-	/* Remember the provided callback functions: */
-	colorStreamingCallback=newColorStreamingCallback;
-	depthStreamingCallback=newDepthStreamingCallback;
+	/* Acquire the color and depth sensors if that hasn't happened yet: */
+	if(!sensorsAcquired)
+		acquireSensors();
 	
-	try
+	/* If a color streaming callback has been registered, create a color frame extractor: */
+	if(colorStreamingCallback!=0)
 		{
-		/* Enable the requested camera streams: */
-		setColorStreamState(colorStreamingCallback!=0);
-		setDepthStreamState(depthStreamingCallback!=0);
+		/* Create a video data format descriptor for the color sensor's selected profile: */
+		Video::VideoDataFormat videoDataFormat;
+		videoDataFormat.setPixelFormat(pixelFormats[colorProfile->format()-OB_FORMAT_YUYV]);
+		videoDataFormat.size=frameSizes[0];
+		videoDataFormat.frameInterval=Math::Rational(1,fps);
 		
-		/* Start streaming: */
-		rs_error* error=0;
-		rs_start_device(device,&error);
-		if(error!=0)
-			{
-			/* Throw an exception: */
-			std::runtime_error exception(Misc::makeStdErrMsg(__PRETTY_FUNCTION__,"Error %s while starting device",rs_get_error_message(error)));
-			rs_free_error(error);
-			throw exception;
-			}
-		
-		/* Start the background streaming thread: */
-		runStreamingThread=true;
-		streamingThread.start(this,&CameraRealSense::streamingThreadMethod);
+		/* Create a color frame extractor: */
+		colorFrameExtractor=Video::ImageExtractor::createExtractor(videoDataFormat);
 		}
-	catch(...)
-		{
-		/* Clean up: */
-		delete colorStreamingCallback;
-		colorStreamingCallback=0;
-		delete depthStreamingCallback;
-		depthStreamingCallback=0;
-		
-		/* Re-throw the exception: */
-		throw;
-		}
+	
+	/* Start streaming on the sensor(s) for which callbacks were registered: */
+	if(colorStreamingCallback!=0)
+		colorSensor->start(colorProfile,std::bind(&CameraOrbbec::colorFrameCallback,this,std::placeholders::_1));
+	if(depthStreamingCallback!=0)
+		depthSensor->start(depthProfile,std::bind(&CameraOrbbec::depthFrameCallback,this,std::placeholders::_1));
+	
+	/* Call the base class method: */
+	DirectFrameSource::startStreaming();
 	}
 
-void CameraRealSense::stopStreaming(void)
+void CameraOrbbec::stopStreaming(void)
 	{
 	/* Bail out if not actually streaming: */
-	if(!runStreamingThread)
+	if(!streaming)
 		return;
 	
-	/* Stop the background streaming thread: */
-	runStreamingThread=false;
-	streamingThread.join();
+	/* Call the base class method: */
+	DirectFrameSource::stopStreaming();
 	
-	/* Delete the callback functions: */
-	delete colorStreamingCallback;
-	colorStreamingCallback=0;
-	delete depthStreamingCallback;
-	depthStreamingCallback=0;
+	/* Stop streaming on the sensor(s) for which callbacks were registered: */
+	if(colorStreamingCallback!=0)
+		colorSensor->stop();
+	if(depthStreamingCallback!=0)
+		depthSensor->stop();
 	
-	/* Stop streaming: */
-	rs_error* error=0;
-	rs_stop_device(device,&error);
-	if(error!=0)
-		{
-		/* Throw an exception: */
-		std::runtime_error exception(Misc::makeStdErrMsg(__PRETTY_FUNCTION__,"Error %s while stopping device",rs_get_error_message(error)));
-		rs_free_error(error);
-		throw exception;
-		}
+	/* Delete a potential color frame extractor: */
+	delete colorFrameExtractor;
+	colorFrameExtractor=0;
 	}
 
-std::string CameraRealSense::getSerialNumber(void)
+std::string CameraOrbbec::getSerialNumber(void)
 	{
-	/* Combine the RealSense prefix and the device's serial number: */
-	std::string result="RS-";
-	rs_error* error=0;
-	const char* serialNumber=rs_get_device_serial(device,&error);
-	if(error!=0)
-		{
-		/* Throw an exception: */
-		std::runtime_error exception(Misc::makeStdErrMsg(__PRETTY_FUNCTION__,"Error %s while querying device's serial number",rs_get_error_message(error)));
-		rs_free_error(error);
-		throw exception;
-		}
-	result.append(serialNumber);
+	/* Combine the Orbbec prefix and the device's serial number: */
+	std::string result="OB-";
+	result.append(device->getDeviceInfo()->serialNumber());
 	
 	return result;
 	}
 
-void CameraRealSense::configure(Misc::ConfigurationFileSection& configFileSection)
+void CameraOrbbec::configure(Misc::ConfigurationFileSection& configFileSection)
 	{
+	/* Throw an exception if the sensors have already been acquired, because that means the caller already queried something that depends on the depth and/or color frame sizes: */
+	if(sensorsAcquired)
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Sensors already acquired");
+	
 	/* Call the base class method: */
 	DirectFrameSource::configure(configFileSection);
 	
-	/* Select the color frame size and frame rate: */
-	if(configFileSection.hasTag("./colorFrameRate"))
-		setFrameRate(COLOR,configFileSection.retrieveValue<int>("./colorFrameRate"));
-	if(configFileSection.hasTag("./colorFrameSize"))
-		setFrameSize(COLOR,configFileSection.retrieveValue<Size>("./colorFrameSize"));
-	
-	/* Select the depth frame size and frame rate: */
-	if(configFileSection.hasTag("./depthFrameRate"))
-		setFrameRate(DEPTH,configFileSection.retrieveValue<int>("./depthFrameRate"));
-	if(configFileSection.hasTag("./depthFrameSize"))
-		setFrameSize(DEPTH,configFileSection.retrieveValue<Size>("./depthFrameSize"));
+	/* Configure the streaming frame sizes and frame rate: */
+	configFileSection.updateValue("./colorFrameSize",frameSizes[0]);
+	configFileSection.updateValue("./depthFrameSize",frameSizes[1]);
+	configFileSection.updateValue("./frameRate",fps);
 	
 	/* Configure the Z value range for custom quantization: */
 	if(configFileSection.hasTag("./depthValueRange"))
 		{
-		Misc::FixedArray<RSDepthPixel,2> depthValueRange=configFileSection.retrieveValue<Misc::FixedArray<RSDepthPixel,2> >("./depthValueRange");
+		Misc::FixedArray<float,2> depthValueRange=configFileSection.retrieveValue<Misc::FixedArray<float,2> >("./depthValueRange");
 		setZRange(depthValueRange[0],depthValueRange[1]);
-		}
-	
-	/* Configure the IR emitter and cameras: */
-	if(configFileSection.hasTag("./irEmitterEnabled"))
-		{
-		setDepthStreamState(true);
-		rs_set_device_option(device,RS_OPTION_R200_EMITTER_ENABLED,configFileSection.retrieveValue<bool>("./irEmitterEnabled")?1.0:0.0,0);
-		}
-	if(configFileSection.hasTag("./irGain"))
-		{
-		setDepthStreamState(true);
-		rs_set_device_option(device,RS_OPTION_R200_LR_GAIN,configFileSection.retrieveValue<double>("./irGain"),0);
-		}
-	if(configFileSection.hasTag("./irExposureAuto"))
-		{
-		setDepthStreamState(true);
-		rs_set_device_option(device,RS_OPTION_R200_LR_AUTO_EXPOSURE_ENABLED,configFileSection.retrieveValue<bool>("./irExposureAuto")?1.0:0.0,0);
-		}
-	if(configFileSection.hasTag("./irExposure"))
-		{
-		setDepthStreamState(true);
-		rs_set_device_option(device,RS_OPTION_R200_LR_EXPOSURE,configFileSection.retrieveValue<double>("./irExposure"),0);
-		}
-	if(configFileSection.hasTag("./depthControlPreset"))
-		{
-		setDepthStreamState(true);
-		static const char* presetNames[]=
-			{
-			"Default",
-			"Off",
-			"Low",
-			"Medium",
-			"Optimized",
-			"High",
-			0
-			};
-		std::string depthControlPreset=configFileSection.retrieveString("./depthControlPreset");
-		int i;
-		for(i=0;presetNames[i]!=0;++i)
-			if(strcasecmp(depthControlPreset.c_str(),presetNames[i])==0)
-				{
-				rs_apply_depth_control_preset(device,i);
-				break;
-				}
-		if(presetNames[i]==0)
-			throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Invalid depth control preset \"%s\"",depthControlPreset.c_str());
 		}
 	}
 
-void CameraRealSense::buildSettingsDialog(GLMotif::RowColumn* settingsDialog)
+void CameraOrbbec::buildSettingsDialog(GLMotif::RowColumn* settingsDialog)
 	{
 	/* Create the base class settings dialog: */
 	DirectFrameSource::buildSettingsDialog(settingsDialog);
 	
-	const GLMotif::StyleSheet& ss=*settingsDialog->getStyleSheet();
-	
-	double optionMin,optionMax,optionStep;
-	
-	/* Create widgets to turn the IR emitter on/off and set IR cameras' gain: */
-	GLMotif::RowColumn* irEmitterGainBox=new GLMotif::RowColumn("IREmitterGainBox",settingsDialog,false);
-	irEmitterGainBox->setOrientation(GLMotif::RowColumn::HORIZONTAL);
-	irEmitterGainBox->setPacking(GLMotif::RowColumn::PACK_TIGHT);
-	irEmitterGainBox->setNumMinorWidgets(1);
-	
-	GLMotif::ToggleButton* irEmitterEnabledToggle=new GLMotif::ToggleButton("IREmitterEnabledToggle",irEmitterGainBox,"IR Emitter");
-	irEmitterEnabledToggle->setBorderWidth(0.0f);
-	irEmitterEnabledToggle->setBorderType(GLMotif::Widget::PLAIN);
-	irEmitterEnabledToggle->setToggle(rs_get_device_option(device,RS_OPTION_R200_EMITTER_ENABLED,0)!=0.0);
-	irEmitterEnabledToggle->getValueChangedCallbacks().add(this,&CameraRealSense::irEmitterEnabledToggleCallback);
-	
-	new GLMotif::Label("IRGainLabel",irEmitterGainBox,"IR Gain");
-	
-	GLMotif::TextFieldSlider* irGainSlider=new GLMotif::TextFieldSlider("IRGainSlider",irEmitterGainBox,5,ss.fontHeight*5.0f);
-	irGainSlider->setSliderMapping(GLMotif::TextFieldSlider::LINEAR);
-	irGainSlider->setValueType(GLMotif::TextFieldSlider::FLOAT);
-	rs_get_device_option_range(device,RS_OPTION_R200_LR_GAIN,&optionMin,&optionMax,&optionStep,0);
-	irGainSlider->setValueRange(optionMin,optionMax,optionStep);
-	irGainSlider->setValue(rs_get_device_option(device,RS_OPTION_R200_LR_GAIN,0));
-	irGainSlider->getValueChangedCallbacks().add(this,&CameraRealSense::irGainSliderCallback);
-	
-	irEmitterGainBox->manageChild();
-	
-	/* Create widgets to set the IR cameras' exposure: */
-	GLMotif::RowColumn* irExposureBox=new GLMotif::RowColumn("IRExposureBox",settingsDialog,false);
-	irExposureBox->setOrientation(GLMotif::RowColumn::HORIZONTAL);
-	irExposureBox->setPacking(GLMotif::RowColumn::PACK_TIGHT);
-	irExposureBox->setNumMinorWidgets(1);
-	
-	new GLMotif::Label("IRExposureLabel",irExposureBox,"IR Exposure");
-	
-	GLMotif::ToggleButton* irExposureAutoToggle=new GLMotif::ToggleButton("IRExposureAutoToggle",irExposureBox,"Auto");
-	irExposureAutoToggle->setBorderWidth(0.0f);
-	irExposureAutoToggle->setBorderType(GLMotif::Widget::PLAIN);
-	irExposureAutoToggle->setToggle(rs_get_device_option(device,RS_OPTION_R200_LR_AUTO_EXPOSURE_ENABLED,0)!=0.0);
-	irExposureAutoToggle->getValueChangedCallbacks().add(this,&CameraRealSense::irExposureAutoToggleCallback);
-	
-	GLMotif::TextFieldSlider* irExposureSlider=new GLMotif::TextFieldSlider("IRExposureSlider",irExposureBox,5,ss.fontHeight*5.0f);
-	irExposureSlider->setSliderMapping(GLMotif::TextFieldSlider::LINEAR);
-	irExposureSlider->setValueType(GLMotif::TextFieldSlider::FLOAT);
-	rs_get_device_option_range(device,RS_OPTION_R200_LR_EXPOSURE,&optionMin,&optionMax,&optionStep,0);
-	irExposureSlider->setValueRange(optionMin,optionMax,optionStep);
-	irExposureSlider->setValue(rs_get_device_option(device,RS_OPTION_R200_LR_EXPOSURE,0));
-	irExposureSlider->getValueChangedCallbacks().add(this,&CameraRealSense::irExposureSliderCallback);
-	
-	/* Disable the exposure slider if auto exposure is enabled: */
-	if(irExposureAutoToggle->getToggle())
-		irExposureSlider->setEnabled(false);
-	
-	irExposureBox->manageChild();
-	
-	/* Create a drop-down box to select 3D reconstruction quality presets: */
-	GLMotif::Margin* qualityMargin=new GLMotif::Margin("QualityMargin",settingsDialog,false);
-	qualityMargin->setAlignment(GLMotif::Alignment::LEFT);
-	
-	GLMotif::RowColumn* qualityBox=new GLMotif::RowColumn("QualityBox",qualityMargin,false);
-	qualityBox->setOrientation(GLMotif::RowColumn::HORIZONTAL);
-	qualityBox->setPacking(GLMotif::RowColumn::PACK_TIGHT);
-	qualityBox->setNumMinorWidgets(1);
-	
-	new GLMotif::Label("QualityLabel",qualityBox,"3D Outlier Removal");
-	
-	GLMotif::DropdownBox* qualityMenu=new GLMotif::DropdownBox("QualityMenu",qualityBox,false);
-	qualityMenu->addItem("Default");
-	qualityMenu->addItem("Off");
-	qualityMenu->addItem("Low");
-	qualityMenu->addItem("Medium");
-	qualityMenu->addItem("Optimized");
-	qualityMenu->addItem("High");
-	qualityMenu->setSelectedItem(0);
-	qualityMenu->getValueChangedCallbacks().add(this,&CameraRealSense::qualityMenuValueChangedCallback);
-	qualityMenu->manageChild();
-	
-	qualityBox->manageChild();
-	
-	qualityMargin->manageChild();
-	}
-
-void CameraOrbbec::setDepthFrameSize(const Size& newDepthFrameSize)
-	{
-	/* Update the requested depth frame size: */
-	depthFrameSize=newDepthFrameSize;
+	// const GLMotif::StyleSheet& ss=*settingsDialog->getStyleSheet();
 	}
 
 void CameraOrbbec::setColorFrameSize(const Size& newColorFrameSize)
 	{
+	/* Throw an exception if the sensors have already been acquired, because that means the caller already queried something that depends on the color frame size: */
+	if(sensorsAcquired)
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Sensors already acquired");
+	
 	/* Update the requested color frame size: */
-	colorFrameSize=newColorFrameSize;
+	frameSizes[0]=newColorFrameSize;
+	}
+
+void CameraOrbbec::setDepthFrameSize(const Size& newDepthFrameSize)
+	{
+	/* Throw an exception if the sensors have already been acquired, because that means the caller already queried something that depends on the depth frame size: */
+	if(sensorsAcquired)
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Sensors already acquired");
+	
+	/* Update the requested depth frame size: */
+	frameSizes[1]=newDepthFrameSize;
 	}
 
 void CameraOrbbec::setFps(unsigned int newFps)
 	{
+	/* Throw an exception if already streaming: */
+	if(streaming)
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Already streaming");
+	
 	/* Update the requested streaming frame rate for both the depth and color sensors: */
 	fps=newFps;
 	}

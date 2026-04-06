@@ -295,6 +295,10 @@ const Size& CameraV2::getActualFrameSize(int sensor) const
 
 void CameraV2::startStreaming(void)
 	{
+	/* Throw an exception if already streaming: */
+	if(streaming)
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Already streaming");
+	
 	/* Check if color streaming is requested: */
 	USB::TransferPool::UserTransferCallback* colorTransferCallback=0;
 	if(colorStreamingCallback!=0)

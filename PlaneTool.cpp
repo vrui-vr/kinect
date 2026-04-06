@@ -373,6 +373,16 @@ void PlaneTool::buttonCallback(int buttonSlotIndex,Vrui::InputDevice::ButtonCall
 			
 			/* Print the plane equation in camera space: */
 			std::cout<<"Camera-space plane equation: x * "<<cNormal<<" = "<<cCentroid*cNormal<<std::endl;
+			
+			/* Set the application's depth plane in camera and world space: */
+			application->depthPlaneValid=true;
+			application->camDepthPlane=RawKinectViewer::Plane(cNormal,cCentroid);
+			#if 0
+			application->worldDepthPlane=application->camDepthPlane; 
+			application->worldDepthPlane.transform(application->intrinsicParameters.depthProjection);
+			#else
+			application->worldDepthPlane=RawKinectViewer::Plane(normal,centroid);
+			#endif
 			}
 		else
 			Vrui::showErrorMessage("PlaneTool","Could not extract plane equation");
