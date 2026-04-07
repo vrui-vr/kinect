@@ -98,6 +98,8 @@ void OrbbecSDKContext::ref(void)
 
 void OrbbecSDKContext::unref(void)
 	{
+	#if 0 // Don't do this right now; it seems to expose a bug in the Orbbec SDK
+	
 	/* Lock the reference mutex: */
 	Threads::Mutex::Lock refLock(refMutex);
 	
@@ -114,6 +116,8 @@ void OrbbecSDKContext::unref(void)
 		// DEBUGGING
 		std::cout<<"Kinect::OrbbecSDKContext: Orbbec SDK context has been destroyed"<<std::endl;
 		}
+	
+	#endif
 	}
 
 OrbbecSDKContext::OrbbecSDKContext(void)

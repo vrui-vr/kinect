@@ -32,6 +32,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <IO/File.h>
 #include <IO/Directory.h>
 #include <Geometry/Point.h>
+#include <Geometry/Box.h>
 #include <Geometry/Ray.h>
 #include <Geometry/OrthogonalTransformation.h>
 #include <GL/gl.h>
@@ -90,7 +91,14 @@ void RawKinectViewer::mapDepth(const Offset& pixel,float depth,GLubyte* result) 
 	if(depthPlaneValid)
 		{
 		/* Color depth pixels by distance to the depth plane: */
-		float dist=camDepthPlane.calcDistance(Plane::Point(float(pixel[0])+0.5f,float(pixel[1])+0.5f,depth));
+		float dist;
+		if(depthPixels!=0)
+			{
+			const IPoint& pixPos=depthPixels[pixel[1]*depthFrameSize[0]+pixel[0]];
+			dist=camDepthPlane.calcDistance(Plane::Point(pixPos[0],pixPos[1],depth));
+			}
+		else
+			dist=camDepthPlane.calcDistance(Plane::Point(float(pixel[0])+0.5f,float(pixel[1])+0.5f,depth));
 		if(dist>=0.0f)
 			{
 			GLubyte col=dist<depthPlaneDistMax?255U-GLubyte((dist*255.0f)/depthPlaneDistMax+0.5f):0U;
@@ -836,7 +844,8 @@ RawKinectViewer::RawKinectViewer(int& argc,char**& argv)
 	 camera(0),
 	 backgroundCaptureNumFrames(0),colorBackground(0),
 	 colorFrameVersion(0),
-	 depthCorrection(0),depthPlaneDistMax(10.0),depthFrameVersion(0),
+	 depthCorrection(0),depthPixels(0),
+	 depthPlaneDistMax(10.0),depthFrameVersion(0),
 	 paused(false),
 	 averageNumFrames(150),averageFrameCounter(0),
 	 averageFrameDepth(0),averageFrameForeground(0),
@@ -983,19 +992,36 @@ RawKinectViewer::RawKinectViewer(int& argc,char**& argv)
 	/* Get the camera's intrinsic parameters: */
 	intrinsicParameters=camera->getIntrinsicParameters();
 	
-	/* Calculate the depth image offset and color image scale: */
-	double depthSize=Math::sqrt(Math::sqr(double(depthFrameSize[0]))+Math::sqr(double(depthFrameSize[1])));
-	double colorSize=Math::sqrt(Math::sqr(double(colorFrameSize[0]))+Math::sqr(double(colorFrameSize[1])));
-	if(intrinsicParameters.depthLensDistortion.isIdentity())
+	/* If the camera's depth camera has non-linear distortion, create a frame of distortion-corrected depth image pixels: */
+	if(!intrinsicParameters.depthLensDistortion.isIdentity())
 		{
-		depthImageOffset=double(depthFrameSize[0]);
-		colorImageScale=depthSize/colorSize;
+		depthPixels=new IPoint[depthFrameSize.volume()];
+		IPoint* dpPtr=depthPixels;
+		for(unsigned int y=0;y<depthFrameSize[1];++y)
+			for(unsigned int x=0;x<depthFrameSize[0];++x,++dpPtr)
+				*dpPtr=IPoint(intrinsicParameters.undistortDepthPixel(x,y));
+		}
+	
+	/* Calculate the depth image offset and color image scale: */
+	double depthSize;
+	if(depthPixels!=0)
+		{
+		/* Calculate the bounding box of all distortion-corrected depth image pixels: */
+		Geometry::Box<float,2> dBox=Geometry::Box<float,2>::empty;
+		IPoint* dpPtr=depthPixels;
+		for(unsigned int y=0;y<depthFrameSize[1];++y)
+			for(unsigned int x=0;x<depthFrameSize[0];++x,++dpPtr)
+				dBox.addPoint(*dpPtr);
+		depthSize=Geometry::dist(dBox.min,dBox.max);
+		depthImageOffset=dBox.max[0];
 		}
 	else
 		{
-		depthImageOffset=double((depthFrameSize[0]*5U)/4U);
-		colorImageScale=depthSize*1.25/colorSize;
+		depthSize=Math::sqrt(Math::sqr(double(depthFrameSize[0]))+Math::sqr(double(depthFrameSize[1])));
+		depthImageOffset=double(depthFrameSize[0]);
 		}
+	double colorSize=Math::sqrt(Math::sqr(double(colorFrameSize[0]))+Math::sqr(double(colorFrameSize[1])));
+	colorImageScale=depthSize/colorSize;
 	
 	/* Allocate the average depth frame buffer: */
 	averageFrameDepth=new float[depthFrameSize.volume()];
@@ -1029,6 +1055,7 @@ RawKinectViewer::~RawKinectViewer(void)
 	delete[] averageFrameDepth;
 	delete[] averageFrameForeground;
 	delete[] colorBackground;
+	delete[] depthPixels;
 	
 	/* Disconnect from the Kinect camera device: */
 	delete camera;
@@ -1319,9 +1346,9 @@ void RawKinectViewer::display(GLContextData& contextData) const
 				
 				/* Draw the next quad: */
 				glTexCoord2f(GLfloat(x)*texScaleX,GLfloat(y)*texScaleY);
-				glVertex2d(up1[0],up1[1]);
+				glVertex2d(up1[0]*colorImageScale,up1[1]*colorImageScale);
 				glTexCoord2f(GLfloat(x)*texScaleX,GLfloat(y-1)*texScaleY);
-				glVertex2d(up0[0],up0[1]);
+				glVertex2d(up0[0]*colorImageScale,up0[1]*colorImageScale);
 				}
 			glEnd();
 			}

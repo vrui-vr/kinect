@@ -247,7 +247,7 @@ void PlaneTool::buttonCallback(int buttonSlotIndex,Vrui::InputDevice::ButtonCall
 		if(allFinite)
 			{
 			/* Print the approximation residual: */
-			std::cout<<"Approximation residual: "<<evs[2]<<std::endl;
+			std::cout<<"Depth-space approximation residual: "<<evs[2]<<std::endl;
 			
 			/* Flip the plane's normal vector if it points the wrong way: */
 			if(centroid*normal<0.0)
@@ -377,12 +377,7 @@ void PlaneTool::buttonCallback(int buttonSlotIndex,Vrui::InputDevice::ButtonCall
 			/* Set the application's depth plane in camera and world space: */
 			application->depthPlaneValid=true;
 			application->camDepthPlane=RawKinectViewer::Plane(cNormal,cCentroid);
-			#if 0
-			application->worldDepthPlane=application->camDepthPlane; 
-			application->worldDepthPlane.transform(application->intrinsicParameters.depthProjection);
-			#else
 			application->worldDepthPlane=RawKinectViewer::Plane(normal,centroid);
-			#endif
 			}
 		else
 			Vrui::showErrorMessage("PlaneTool","Could not extract plane equation");

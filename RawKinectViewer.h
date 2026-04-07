@@ -60,6 +60,7 @@ class RawKinectViewer:public Vrui::Application,public GLObject
 	typedef Kinect::FrameSource::ColorComponent ColorComponent; // Type for color frame pixel components
 	typedef Kinect::FrameSource::ColorPixel ColorPixel; // Type for color frame pixels
 	typedef Kinect::FrameSource::DepthCorrection::PixelCorrection PixelCorrection; // Type for per-pixel depth correction factors
+	typedef Geometry::Point<float,2> IPoint; // Type for image points
 	typedef Kinect::FrameSource::IntrinsicParameters IntrinsicParameters; // Type for camera intrinsic parameters
 	typedef IntrinsicParameters::PTransform PTransform; // Type for depth camera unprojection and color camera projection matrices
 	typedef PTransform::Point CPoint; // Type for camera-space points
@@ -108,6 +109,7 @@ class RawKinectViewer:public Vrui::Application,public GLObject
 	Size depthFrameSize; // Size of depth frames in pixels
 	PixelCorrection* depthCorrection; // Buffer containing per-pixel depth correction coefficients
 	IntrinsicParameters intrinsicParameters; // Intrinsic parameters of the Kinect camera
+	IPoint* depthPixels; // If the depth camera has non-linear lens distortion, 2D array of distortion-corrected depth pixel positions
 	double depthImageOffset; // Offset to display depth image
 	double colorImageScale; // Scale factor to display color image
 	float depthValueRange[2]; // Range of depth values mapped to the depth color map

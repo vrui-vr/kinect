@@ -29,6 +29,10 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 
 #include "RawKinectViewer.h"
 
+// DEBUGGING
+#include <iostream>
+#include <Geometry/OutputOperators.h>
+
 /***************************************
 Static elements of class PointPlaneTool:
 ***************************************/
@@ -99,6 +103,7 @@ void PointPlaneTool::buttonCallback(int buttonSlotIndex,Vrui::InputDevice::Butto
 			#else
 			
 			RawKinectViewer::CPoint imagePoint=application->getDepthImagePoint(application->calcImagePoint(getButtonDeviceRay(0)));
+			
 			if(imagePoint[2]>=RawKinectViewer::CPoint::Scalar(0))
 				{
 				/* Add the point to the list: */
@@ -132,15 +137,24 @@ void PointPlaneTool::buttonCallback(int buttonSlotIndex,Vrui::InputDevice::Butto
 				
 				if(allFinite)
 					{
-					/* Let the plane point towards the camera: */
+					/* Print the approximation residual: */
+					std::cout<<"Depth-space approximation residual: "<<evs[2]<<std::endl;
+					
+					/* Flip the plane's normal vector if it points the wrong way: */
 					if(normal[2]>0.0)
 						normal=-normal;
+					
+					/* Print the plane equation in depth image space: */
+					std::cout<<"Depth-space plane equation: x * "<<normal<<" = "<<centroid*normal<<std::endl;
 					
 					/* Set the application's depth plane in camera and world space: */
 					application->depthPlaneValid=true;
 					application->camDepthPlane=RawKinectViewer::Plane(normal,centroid);
 					application->worldDepthPlane=application->camDepthPlane; 
 					application->worldDepthPlane.transform(application->intrinsicParameters.depthProjection);
+					
+					/* Print the plane equation in camera space: */
+					std::cout<<"Camera-space plane equation: x * "<<application->worldDepthPlane.getNormal()<<" = "<<application->worldDepthPlane.getOffset()<<std::endl;
 					
 					/* Clear the selected point set: */
 					points.clear();

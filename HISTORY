@@ -390,3 +390,9 @@ Kinect-6.0:
   all projector classes to use glTexSubImage when updating color frames.
 - Added getRgbInternalFormat method to Kinect::ProjectorBase to properly
   handle gamma-corrected OpenGL contexts.
+- Fixed color mapping of depth planes extracted by PointPlaneTool in
+  RawKinectViewer.
+  - Planes from PlaneTool still not mapping properly.
+- Fixed creation of intrinsic camera parameters in CameraOrbbec.
+- Temporarily disabled automatic destruction of Orbbec SDK contexts in
+  OrbbecSDKContext, as it triggers a bug in the Orbbec SDK.

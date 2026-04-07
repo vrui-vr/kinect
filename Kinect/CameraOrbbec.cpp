@@ -305,34 +305,56 @@ FrameSource::IntrinsicParameters CameraOrbbec::getIntrinsicParameters(void)
 	/* Retrieve the depth sensor's lens distortion correction coefficients: */
 	result.depthLensDistortion=getLensDistortion(*depthProfile);
 	
+	/* Create the transformation from depth image space to tangent space: */
+	OBCameraIntrinsic depthIntrinsics=depthProfile->getIntrinsic();
+	IntrinsicParameters::ATransform::Matrix& di2tMat=result.di2t.getMatrix();
+	di2tMat(0,0)=1.0/depthIntrinsics.fx;
+	di2tMat(0,1)=0.0;
+	di2tMat(0,2)=-(depthIntrinsics.cx+0.5)/depthIntrinsics.fx; // Add 0.5 because Orbbec SDK assumes pixels at integer positions
+	di2tMat(1,0)=0.0;
+	di2tMat(1,1)=1.0/depthIntrinsics.fy;
+	di2tMat(1,2)=-(double(frameSizes[1][1])-(depthIntrinsics.cy+0.5))/depthIntrinsics.fy; // Invert because we flip the depth frame, and add 0.5 because see above
+	
+	/* Calculate the inverse: */
+	result.dt2i=Geometry::invert(result.di2t);
+	
 	/* Create the projection from depth image space into 3D camera space: */
 	IntrinsicParameters::PTransform::Matrix& dMat=result.depthProjection.getMatrix();
 	dMat=IntrinsicParameters::PTransform::Matrix::zero;
-	OBCameraIntrinsic depthIntrinsics=depthProfile->getIntrinsic();
-	
-	dMat(0,0)=1.0/depthIntrinsics.fx;
-	dMat(0,3)=-(depthIntrinsics.cx+0.5)/depthIntrinsics.fx; // Add 0.5 because Orbbec SDK assumes pixels at integer positions
-	dMat(1,1)=1.0/depthIntrinsics.fy;
-	dMat(1,3)=-(double(frameSizes[1][1])-depthIntrinsics.cy+0.5)/depthIntrinsics.fy; // Invert because we flip the depth frame, and add 0.5 because see above
+	dMat(0,0)=di2tMat(0,0);
+	dMat(0,3)=di2tMat(0,2);
+	dMat(1,1)=di2tMat(1,1);
+	dMat(1,3)=di2tMat(1,2);
 	dMat(2,3)=-1.0;
 	double b=double(dMax)*double(zRange[1])/(double(zRange[1])-double(zRange[0]));
 	double a=b*double(zRange[0]);
-	
 	dMat(3,2)=-1.0/a;
 	dMat(3,3)=b/a;
 	
 	/* Retrieve the color sensor's lens distortion correction coefficients: */
 	result.colorLensDistortion=getLensDistortion(*colorProfile);
 	
+	/* Create the transformation from tangent space to color image space: */
+	OBCameraIntrinsic colorIntrinsics=colorProfile->getIntrinsic();
+	IntrinsicParameters::ATransform::Matrix& ct2iMat=result.ct2i.getMatrix();
+	ct2iMat(0,0)=-colorIntrinsics.fx;
+	ct2iMat(0,1)=0.0;
+	ct2iMat(0,2)=colorIntrinsics.cx+0.5; // Add 0.5 because Orbbec SDK assumes pixels at integer positions
+	ct2iMat(1,0)=0.0;
+	ct2iMat(1,1)=-colorIntrinsics.fy;
+	ct2iMat(1,2)=double(frameSizes[0][1])-(colorIntrinsics.cy+0.5); // Invert because we flip the color frame, and add 0.5 because see above
+	
+	/* Calculate the inverse: */
+	result.ci2t=Geometry::invert(result.ct2i);
+	
 	/* Create the projection from 3D camera space into color image space: */
 	IntrinsicParameters::PTransform::Matrix& cMat=result.colorProjection.getMatrix();
 	cMat=IntrinsicParameters::PTransform::Matrix::zero;
-	OBCameraIntrinsic colorIntrinsics=colorProfile->getIntrinsic();
 	
-	cMat(0,0)=-colorIntrinsics.fx/double(frameSizes[0][0]);
-	cMat(0,2)=(colorIntrinsics.cx+0.5)/double(frameSizes[0][0]); // Add 0.5 because Orbbec SDK assumes pixels at integer positions
-	cMat(1,1)=-colorIntrinsics.fy/double(frameSizes[0][1]);
-	cMat(1,2)=1.0-(colorIntrinsics.cy+0.5)/double(frameSizes[0][1]); // Invert because we flip the color frame, and add 0.5 because see above
+	cMat(0,0)=ct2iMat(0,0)/double(frameSizes[0][0]);
+	cMat(0,2)=ct2iMat(0,2)/double(frameSizes[0][0]);
+	cMat(1,1)=ct2iMat(1,1)/double(frameSizes[0][1]);
+	cMat(1,2)=ct2iMat(1,2)/double(frameSizes[0][1]);
 	cMat(2,3)=-1.0;
 	cMat(3,2)=1.0;
 	
@@ -350,9 +372,6 @@ FrameSource::IntrinsicParameters CameraOrbbec::getIntrinsicParameters(void)
 	
 	/* Concatenate the depth un-projection matrix to transform directly from depth image space to color image space: */
 	result.colorProjection*=result.depthProjection;
-	
-	/* Update the intrinsic transformations: */
-	result.updateTransforms();
 	
 	return result;
 	}
