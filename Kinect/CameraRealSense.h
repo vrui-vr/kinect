@@ -1,6 +1,6 @@
 /***********************************************************************
 CameraRealSense - Class representing an Intel RealSense camera.
-Copyright (c) 2016-2022 Oliver Kreylos
+Copyright (c) 2016-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -58,8 +58,6 @@ class CameraRealSense:public DirectFrameSource
 	unsigned int a,b; // Coefficients for the depth quantization formula d=b-(a/z)
 	volatile bool runStreamingThread; // Flag to keep the background streaming thread running
 	Threads::Thread streamingThread; // Background thread reading frames from the RealSense camera and dispatching streaming callbacks
-	StreamingCallback* colorStreamingCallback; // Callback called when a new color frame arrives
-	StreamingCallback* depthStreamingCallback; // Callback called when a new depth frame arrives
 	
 	/* Private methods: */
 	void initialize(void); // Initializes the RealSense camera; called from constructors
@@ -83,7 +81,7 @@ class CameraRealSense:public DirectFrameSource
 	virtual DepthCorrection* getDepthCorrectionParameters(void);
 	virtual IntrinsicParameters getIntrinsicParameters(void);
 	virtual const Size& getActualFrameSize(int sensor) const;
-	virtual void startStreaming(StreamingCallback* newColorStreamingCallback,StreamingCallback* newDepthStreamingCallback);
+	virtual void startStreaming(void);
 	virtual void stopStreaming(void);
 	
 	/* Methods from class DirectFrameSource: */
