@@ -218,7 +218,7 @@ void CameraOrbbec::initialize(void)
 	{
 	/* Set the default color and depth streaming formats: */
 	// frameSizes[0]=Size(1920,1080);
-	frameSizes[0]=Size(3840,2160);
+	frameSizes[0]=Size(1920,1080);
 	frameSizes[1]=Size(640,576);
 	fps=30;
 	

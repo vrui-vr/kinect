@@ -396,3 +396,5 @@ Kinect-6.0:
 - Fixed creation of intrinsic camera parameters in CameraOrbbec.
 - Temporarily disabled automatic destruction of Orbbec SDK contexts in
   OrbbecSDKContext, as it triggers a bug in the Orbbec SDK.
+- Fixed plane extractor tools in RawKinectViewer.
+- Added pause tool to KinectViewer.

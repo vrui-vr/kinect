@@ -141,7 +141,7 @@ void PointPlaneTool::buttonCallback(int buttonSlotIndex,Vrui::InputDevice::Butto
 					std::cout<<"Depth-space approximation residual: "<<evs[2]<<std::endl;
 					
 					/* Flip the plane's normal vector if it points the wrong way: */
-					if(normal[2]>0.0)
+					if(centroid*normal<0.0)
 						normal=-normal;
 					
 					/* Print the plane equation in depth image space: */
@@ -152,6 +152,9 @@ void PointPlaneTool::buttonCallback(int buttonSlotIndex,Vrui::InputDevice::Butto
 					application->camDepthPlane=RawKinectViewer::Plane(normal,centroid);
 					application->worldDepthPlane=application->camDepthPlane; 
 					application->worldDepthPlane.transform(application->intrinsicParameters.depthProjection);
+					if(application->worldDepthPlane.getOffset()>0.0)
+						application->worldDepthPlane.flip();
+					application->worldDepthPlane.normalize();
 					
 					/* Print the plane equation in camera space: */
 					std::cout<<"Camera-space plane equation: x * "<<application->worldDepthPlane.getNormal()<<" = "<<application->worldDepthPlane.getOffset()<<std::endl;

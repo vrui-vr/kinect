@@ -376,8 +376,8 @@ void PlaneTool::buttonCallback(int buttonSlotIndex,Vrui::InputDevice::ButtonCall
 			
 			/* Set the application's depth plane in camera and world space: */
 			application->depthPlaneValid=true;
-			application->camDepthPlane=RawKinectViewer::Plane(cNormal,cCentroid);
-			application->worldDepthPlane=RawKinectViewer::Plane(normal,centroid);
+			application->camDepthPlane=RawKinectViewer::Plane(normal,centroid);
+			application->worldDepthPlane=RawKinectViewer::Plane(cNormal,cCentroid);
 			}
 		else
 			Vrui::showErrorMessage("PlaneTool","Could not extract plane equation");

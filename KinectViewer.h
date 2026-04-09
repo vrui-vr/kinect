@@ -1,7 +1,7 @@
 /***********************************************************************
 KinectViewer - Simple application to view 3D reconstructions of color
 and depth images captured from a Kinect device.
-Copyright (c) 2010-2018 Oliver Kreylos
+Copyright (c) 2010-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -137,6 +137,7 @@ class KinectViewer:public Vrui::Application
 	GLMotif::ToggleButton* saveStreamsToggle; // Toggle button to save 3D video streams to files
 	IO::DirectoryPtr saveStreamsDirectory; // Last directory used/viewed when saving 3D video streams to files
 	GLMotif::FileSelectionDialog* saveStreamsFileSelectionDialog; // Pointer to file selection dialog if user is preparing to save 3D video streams
+	bool paused; // Flag whether all 3D video streams are currently paused
 	Sound::SoundRecorder* soundRecorder; // Recorder to save sound from the default sound source while saving 3D video streams
 	Sound::SoundPlayer* soundPlayer; // Player to play back sound from a previously saved 3D video stream
 	// Vrui::InputDevice* cameraDevice; // Pointer to the device to which the depth camera is attached
@@ -158,10 +159,11 @@ class KinectViewer:public Vrui::Application
 	KinectViewer(int& argc,char**& argv);
 	virtual ~KinectViewer(void);
 	
-	/* Methods from Vrui::Application: */
+	/* Methods from class Vrui::Application: */
 	virtual void frame(void);
 	virtual void display(GLContextData& contextData) const;
 	virtual void resetNavigation(void);
+	virtual void eventCallback(EventID eventId,Vrui::InputDevice::ButtonCallbackData* cbData);
 	};
 
 #endif

@@ -611,6 +611,7 @@ void KinectViewer::saveStreamsCancelCallback(GLMotif::FileSelectionDialog::Cance
 KinectViewer::KinectViewer(int& argc,char**& argv)
 	:Vrui::Application(argc,argv),
 	 saveStreamsToggle(0),saveStreamsDirectory(IO::Directory::getCurrent()),saveStreamsFileSelectionDialog(0),
+	 paused(false),
 	 soundRecorder(0),soundPlayer(0),
 	 mainMenu(0)
 	{
@@ -783,6 +784,7 @@ KinectViewer::KinectViewer(int& argc,char**& argv)
 	Vrui::setMainMenu(mainMenu);
 	
 	/* Initialize the custom tool classes: */
+	addEventTool("Pause Streams",0,0);
 	SphereExtractorTool::initClass();
 	
 	/* Get a common time base for all streamers: */
@@ -833,14 +835,17 @@ KinectViewer::~KinectViewer(void)
 
 void KinectViewer::frame(void)
 	{
-	/* Process all streamers: */
-	for(std::vector<KinectStreamer*>::iterator sIt=streamers.begin();sIt!=streamers.end();++sIt)
-		(*sIt)->frame();
-	
-	#if 0
-	/* Animate the animated model: */
-	anim.frame();
-	#endif
+	if(!paused)
+		{
+		/* Process all streamers: */
+		for(std::vector<KinectStreamer*>::iterator sIt=streamers.begin();sIt!=streamers.end();++sIt)
+			(*sIt)->frame();
+		
+		#if 0
+		/* Animate the animated model: */
+		anim.frame();
+		#endif
+		}
 	}
 
 void KinectViewer::display(GLContextData& contextData) const
@@ -920,6 +925,21 @@ void KinectViewer::resetNavigation(void)
 	
 	/* Center the resulting box in the view: */
 	Vrui::setNavigationTransformation(Geometry::mid(bbox.min,bbox.max),Math::div2(Geometry::dist(bbox.min,bbox.max)));
+	}
+
+void KinectViewer::eventCallback(EventID eventId,Vrui::InputDevice::ButtonCallbackData* cbData)
+	{
+	/* Check if the event tool button was just pressed: */
+	if(cbData->newButtonState)
+		{
+		switch(eventId)
+			{
+			case 0:
+				/* Toggle the viewer's paused flag: */
+				paused=!paused;
+				break;
+			}
+		}
 	}
 
 VRUI_APPLICATION_RUN(KinectViewer)
