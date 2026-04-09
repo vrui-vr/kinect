@@ -1,6 +1,6 @@
 /***********************************************************************
 CameraOrbbecDummy - Class to dummy out support for Orbbec cameras.
-Copyright (c) 2025 Oliver Kreylos
+Copyright (c) 2025-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -23,14 +23,34 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Kinect/CameraOrbbec.h>
 
 #include <string>
-#include <stdexcept>
-#include <Misc/FunctionCalls.h>
+#include <Misc/StdError.h>
 
 namespace Kinect {
 
 /*****************************
 Methods of class CameraOrbbec:
 *****************************/
+
+void CameraOrbbec::acquireSensors(void)
+	{
+	/* Never called */
+	}
+
+FrameSource::IntrinsicParameters::LensDistortion CameraOrbbec::getLensDistortion(ob::VideoStreamProfile& profile)
+	{
+	/* Never called */
+	return FrameSource::IntrinsicParameters::LensDistortion();
+	}
+
+void CameraOrbbec::colorFrameCallback(std::shared_ptr<ob::Frame> frame)
+	{
+	/* Never called */
+	}
+
+void CameraOrbbec::depthFrameCallback(std::shared_ptr<ob::Frame> frame)
+	{
+	/* Never called */
+	}
 
 void CameraOrbbec::initialize(void)
 	{
@@ -42,19 +62,14 @@ size_t CameraOrbbec::getNumDevices(void)
 	return 0;
 	}
 
-CameraOrbbec::CameraOrbbec(libusb_device* sDevice)
-	{
-	throw std::runtime_error("Kinect::CameraOrbbec: Orbbec cameras using Orbbec SDK not supported by Kinect library");
-	}
-
 CameraOrbbec::CameraOrbbec(size_t index)
 	{
-	throw std::runtime_error("Kinect::CameraOrbbec: Orbbec cameras using Orbbec SDK not supported by Kinect library");
+	throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Orbbec cameras using Orbbec SDK not supported by Kinect library");
 	}
 
 CameraOrbbec::CameraOrbbec(const char* serialNumber)
 	{
-	throw std::runtime_error("Kinect::CameraOrbbec: Orbbec cameras using Orbbec SDK not supported by Kinect library");
+	throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Orbbec cameras using Orbbec SDK not supported by Kinect library");
 	}
 
 CameraOrbbec::~CameraOrbbec(void)
@@ -63,33 +78,66 @@ CameraOrbbec::~CameraOrbbec(void)
 
 FrameSource::DepthCorrection* CameraOrbbec::getDepthCorrectionParameters(void)
 	{
+	/* Never called */
 	return 0;
 	}
 
 FrameSource::IntrinsicParameters CameraOrbbec::getIntrinsicParameters(void)
 	{
+	/* Never called */
 	return IntrinsicParameters();
 	}
 
 const Size& CameraOrbbec::getActualFrameSize(int sensor) const
 	{
-	/* Return the appropriate frame size: */
+	/* Never called */
 	return frameSizes[sensor];
 	}
 
-void CameraOrbbec::startStreaming(FrameSource::StreamingCallback* newColorStreamingCallback,FrameSource::StreamingCallback* newDepthStreamingCallback)
+void CameraOrbbec::startStreaming(void)
 	{
-	delete newColorStreamingCallback;
-	delete newDepthStreamingCallback;
+	/* Never called */
 	}
 
 void CameraOrbbec::stopStreaming(void)
 	{
+	/* Never called */
 	}
 
 std::string CameraOrbbec::getSerialNumber(void)
 	{
+	/* Never called */
 	return std::string();
+	}
+
+void CameraOrbbec::configure(Misc::ConfigurationFileSection& configFileSection)
+	{
+	/* Never called */
+	}
+
+void CameraOrbbec::buildSettingsDialog(GLMotif::RowColumn* settingsDialog)
+	{
+	/* Never called */
+	}
+
+void CameraOrbbec::setColorFrameSize(const Size& newColorFrameSize)
+	{
+	/* Never called */
+	}
+
+void CameraOrbbec::setDepthFrameSize(const Size& newDepthFrameSize)
+	{
+	/* Never called */
+	}
+
+void CameraOrbbec::setFps(unsigned int newFps)
+	{
+	/* Never called */
+	}
+
+void CameraOrbbec::setZRange(float zMin,float zMax)
+	{
+	/* Never called */
 	}
 
 }

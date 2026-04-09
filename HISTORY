@@ -398,3 +398,4 @@ Kinect-6.0:
   OrbbecSDKContext, as it triggers a bug in the Orbbec SDK.
 - Fixed plane extractor tools in RawKinectViewer.
 - Added pause tool to KinectViewer.
+- Fixed up Kinect/CameraOrbbecDummy.cpp.
