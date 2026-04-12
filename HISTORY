@@ -399,3 +399,5 @@ Kinect-6.0:
 - Fixed plane extractor tools in RawKinectViewer.
 - Added pause tool to KinectViewer.
 - Fixed up Kinect/CameraOrbbecDummy.cpp.
+- Removed unused code from PointPlaneTool.
+- Improved output format in MeasurementTool.

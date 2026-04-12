@@ -81,7 +81,11 @@ void MeasurementTool::buttonCallback(int buttonSlotIndex,Vrui::InputDevice::Butt
 			{
 			/* Transform the image point to world space and print it: */
 			RawKinectViewer::CPoint worldPoint=application->intrinsicParameters.depthProjection.transform(depthImagePoint);
-			std::cout<<std::setw(20)<<worldPoint<<std::endl;
+			std::streamsize oldPrecision=std::cout.precision(3);
+			std::ios::fmtflags oldFlags=std::cout.setf(std::ios::fixed,std::ios::floatfield);
+			std::cout<<std::setw(9)<<worldPoint<<std::endl;
+			std::cout.precision(oldPrecision);
+			std::cout.setf(oldFlags,std::ios::floatfield);
 			}
 		}
 	}

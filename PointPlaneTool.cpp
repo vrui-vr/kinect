@@ -1,6 +1,6 @@
 /***********************************************************************
 PointPlaneTool - Calibration tool for RawKinectViewer.
-Copyright (c) 2013-2020 Oliver Kreylos
+Copyright (c) 2013-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -22,16 +22,15 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 
 #include "PointPlaneTool.h"
 
+#include <iostream>
+#include <iomanip>
 #include <Math/Math.h>
 #include <Geometry/PCACalculator.h>
+#include <Geometry/OutputOperators.h>
 #include <GL/gl.h>
 #include <Vrui/Vrui.h>
 
 #include "RawKinectViewer.h"
-
-// DEBUGGING
-#include <iostream>
-#include <Geometry/OutputOperators.h>
 
 /***************************************
 Static elements of class PointPlaneTool:
@@ -79,38 +78,12 @@ void PointPlaneTool::buttonCallback(int buttonSlotIndex,Vrui::InputDevice::Butto
 		if(buttonSlotIndex==0)
 			{
 			/* Select another depth image point: */
-			#if 0
-			
-			Point newP=Point(application->calcImagePoint(getButtonDeviceRay(0)));
-			if(application->averageFrameValid&&newP[0]>=-double(application->depthFrameSize[0])&&newP[0]<0.0&&newP[1]>=0.0&&newP[1]<double(application->depthFrameSize[1]))
-				{
-				/* Calculate the selected point's depth: */
-				unsigned int x=(unsigned int)(newP[0]+double(application->depthFrameSize[0]));
-				unsigned int y=(unsigned int)newP[1];
-				unsigned int index=y*application->depthFrameSize[0]+x;
-				if(application->averageFrameForeground[index]>=float(application->averageNumFrames)*0.5f)
-					{
-					newP[0]=double(x)+0.5;
-					newP[1]=double(y)+0.5;
-					if(application->depthCorrection!=0)
-						newP[2]=double(application->depthCorrection[index].correct(application->averageFrameDepth[index]/application->averageFrameForeground[index]));
-					else
-						newP[2]=double(application->averageFrameDepth[index]/application->averageFrameForeground[index]);
-					points.push_back(newP);
-					}
-				}
-			
-			#else
-			
 			RawKinectViewer::CPoint imagePoint=application->getDepthImagePoint(application->calcImagePoint(getButtonDeviceRay(0)));
-			
 			if(imagePoint[2]>=RawKinectViewer::CPoint::Scalar(0))
 				{
 				/* Add the point to the list: */
 				points.push_back(imagePoint);
 				}
-			
-			#endif
 			}
 		else
 			{
