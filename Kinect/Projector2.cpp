@@ -24,7 +24,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 
 #include <Kinect/Projector2.h>
 
-#define DEBUGGING 0
+#define DEBUGGING 1
 
 #include <string>
 #include <Misc/PrintInteger.h>
@@ -41,6 +41,9 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <GL/Extensions/GLARBTextureNonPowerOfTwo.h>
 #include <GL/Extensions/GLARBTextureRectangle.h>
 #include <GL/Extensions/GLARBTextureRg.h>
+#include <GL/Extensions/GLARBShaderObjects.h>
+#include <GL/Extensions/GLARBVertexShader.h>
+#include <GL/Extensions/GLARBFragmentShader.h>
 #include <GL/Extensions/GLEXTGpuShader4.h>
 #include <GL/GLLightTracker.h>
 #include <GL/GLTransformationWrappers.h>
@@ -56,11 +59,11 @@ namespace Kinect {
 Methods of class Projector2::DataItem:
 *************************************/
 
-Projector2::DataItem::DataItem(void)
+Projector2::DataItem::DataItem(GLShaderManager::Namespace& sShaderNamespace)
 	:vertexBufferId(0),depthCorrectionTextureId(0),
 	 depthTextureId(0),indexBufferId(0),meshVersion(0),
 	 colorTextureId(0),colorFrameVersion(0),
-	 renderingShaderSettingsVersion(0),lightStateVersion(0)
+	 shaderNamespace(sShaderNamespace)
 	{
 	/* Initialize the required OpenGL extensions: */
 	GLARBMultitexture::initExtension();
@@ -69,6 +72,9 @@ Projector2::DataItem::DataItem(void)
 	GLARBTextureRectangle::initExtension();
 	GLARBTextureRg::initExtension();
 	GLARBVertexBufferObject::initExtension();
+	GLARBShaderObjects::initExtension();
+	GLARBVertexShader::initExtension();
+	GLARBFragmentShader::initExtension();
 	GLEXTGpuShader4::initExtension();
 	
 	/* Allocate buffer objects: */
@@ -186,10 +192,14 @@ void* Projector2::depthFrameProcessingThreadMethod(void)
 	return 0;
 	}
 
-void Projector2::buildRenderingShader(DataItem* dataItem,GLLightTracker* lightTracker) const
+void Projector2::buildRenderingShader(GLShaderManager::Namespace& shaderNamespace,unsigned int shaderIndex,GLLightTracker* lightTracker) const
 	{
-	/* Rebuild the rendering shader: */
-	dataItem->renderingShader.reset();
+	#if DEBUGGING
+	std::cout<<"Rebuilding facade rendering shader "<<shaderIndex<<std::endl;
+	#endif
+	
+	/* Destroy the current shader: */
+	shaderNamespace.setShader(shaderIndex,0);
 	
 	/* Start vertex shader's declarations: */
 	std::string vertexShaderDeclarations="\
@@ -328,7 +338,7 @@ void Projector2::buildRenderingShader(DataItem* dataItem,GLLightTracker* lightTr
 		}
 	
 	/* Compile the vertex shader: */
-	dataItem->renderingShader.compileVertexShaderFromString((vertexShaderDeclarations+vertexShaderFunctions+vertexShaderMain).c_str());
+	GLhandleARB vertexShader=glCompileVertexShaderFromStrings(3,vertexShaderDeclarations.c_str(),vertexShaderFunctions.c_str(),vertexShaderMain.c_str());
 	
 	/* Start fragment shader's main function: */
 	std::string fragmentShaderMain="\
@@ -395,37 +405,39 @@ void Projector2::buildRenderingShader(DataItem* dataItem,GLLightTracker* lightTr
 		}
 	
 	/* Compile the fragment shader: */
-	dataItem->renderingShader.compileFragmentShaderFromString((fragmentShaderDeclarations+fragmentShaderMain).c_str());
+	GLhandleARB fragmentShader=glCompileFragmentShaderFromStrings(2,fragmentShaderDeclarations.c_str(),fragmentShaderMain.c_str());
 	
-	/* Link the shader: */
-	dataItem->renderingShader.linkShader();
+	/* Link the shader program: */
+	GLhandleARB shader=glCreateProgramObjectARB();
+	glAttachObjectARB(shader,vertexShader);
+	glAttachObjectARB(shader,fragmentShader);
+	glLinkAndTestShader(shader);
+	
+	/* Release extra references for the vertex and fragment shaders: */
+	glDeleteObjectARB(vertexShader);
+	glDeleteObjectARB(fragmentShader);
+	
+	/* Store the shader program in the namespace: */
+	shaderNamespace.setShader(shaderIndex,shader);
 	
 	/* Query the rendering shader's uniform variable locations: */
-	int* rsuPtr=dataItem->renderingShaderUniforms;
-	*(rsuPtr++)=dataItem->renderingShader.getUniformLocation("depthSampler");
+	unsigned int variableIndex=0;
+	shaderNamespace.setUniformLocation(shaderIndex,variableIndex++,"depthSampler");
 	if(depthCorrection!=0)
-		*(rsuPtr++)=dataItem->renderingShader.getUniformLocation("depthCorrectionSampler");
+		shaderNamespace.setUniformLocation(shaderIndex,variableIndex++,"depthCorrectionSampler");
 	if(mapTexture)
-		*(rsuPtr++)=dataItem->renderingShader.getUniformLocation("colorProjection");
+		shaderNamespace.setUniformLocation(shaderIndex,variableIndex++,"colorProjection");
+	shaderNamespace.setUniformLocation(shaderIndex,variableIndex++,"depthProjection");
 	if(illuminate)
-		{
-		*(rsuPtr++)=dataItem->renderingShader.getUniformLocation("depthProjection");
-		*(rsuPtr++)=dataItem->renderingShader.getUniformLocation("inverseTransposedDepthProjection");
-		}
-	else
-		*(rsuPtr++)=dataItem->renderingShader.getUniformLocation("depthProjection");
+		shaderNamespace.setUniformLocation(shaderIndex,variableIndex++,"inverseTransposedDepthProjection");
 	if(mapTexture)
-		*(rsuPtr++)=dataItem->renderingShader.getUniformLocation("colorSampler");
-	
-	/* Mark the rendering shader as up-to-date: */
-	dataItem->renderingShaderSettingsVersion=renderingShaderSettingsVersion;
-	dataItem->lightStateVersion=lightTracker->getVersion();
+		shaderNamespace.setUniformLocation(shaderIndex,variableIndex++,"colorSampler");
 	}
 
 Projector2::Projector2(void)
 	:inDepthFrameVersion(0),
 	 filterDepthFrames(false),lowpassDepthFrames(false),filteredDepthFrame(0),spatialFilterBuffer(0),
-	 mapTexture(true),illuminate(false),renderingShaderSettingsVersion(1),
+	 mapTexture(true),illuminate(false),
 	 meshVersion(0),colorFrameVersion(0)
 	{
 	}
@@ -435,7 +447,7 @@ Projector2::Projector2(FrameSource& frameSource)
 	 GLObject(false),
 	 inDepthFrameVersion(0),
 	 filterDepthFrames(false),lowpassDepthFrames(false),filteredDepthFrame(0),spatialFilterBuffer(0),
-	 mapTexture(true),illuminate(false),renderingShaderSettingsVersion(1),
+	 mapTexture(true),illuminate(false),
 	 meshVersion(0),colorFrameVersion(0)
 	{
 	/* Set the depth frame size again to update the quad case vertex offset table: */
@@ -493,19 +505,51 @@ void Projector2::setDepthFrameSize(const Size& newDepthFrameSize)
 	quadCaseVertexOffsets[0xf][5]=depthSize[0]+1;
 	}
 
-void Projector2::setColorSpace(FrameSource::ColorSpace newColorSpace)
-	{
-	/* Call the base class method: */
-	ProjectorBase::setColorSpace(newColorSpace);
-	
-	/* Invalidate the rendering shader: */
-	++renderingShaderSettingsVersion;
-	}
-
 void Projector2::initContext(GLContextData& contextData) const
 	{
+	/* Create a namespace to hold the GLSL rendering shader: */
+	static const unsigned int numShaderUniforms[16]=
+		{
+		2, // No depth correction, RGB, no texture mapping, no illumination
+		3, // No depth correction, RGB, no texture mapping, illumination
+		4, // No depth correction, RGB, texture mapping, no illumination
+		5, // No depth correction, RGB, texture mapping, illumination
+		2, // No depth correction, YpCbCr, no texture mapping, no illumination
+		3, // No depth correction, YpCbCr, no texture mapping, illumination
+		4, // No depth correction, YpCbCr, texture mapping, no illumination
+		5, // No depth correction, YpCbCr, texture mapping, illumination
+		3, // Depth correction, RGB, no texture mapping, no illumination
+		4, // Depth correction, RGB, no texture mapping, illumination
+		5, // Depth correction, RGB, texture mapping, no illumination
+		6, // Depth correction, RGB, texture mapping, illumination
+		3, // Depth correction, YpCbCr, no texture mapping, no illumination
+		4, // Depth correction, YpCbCr, no texture mapping, illumination
+		5, // Depth correction, YpCbCr, texture mapping, no illumination
+		6  // Depth correction, YpCbCr, texture mapping, illumination
+		};
+	static const unsigned int numShaderVersionNumbers[16]=
+		{
+		0, // No depth correction, RGB, no texture mapping, no illumination
+		1, // No depth correction, RGB, no texture mapping, illumination
+		0, // No depth correction, RGB, texture mapping, no illumination
+		1, // No depth correction, RGB, texture mapping, illumination
+		0, // No depth correction, YpCbCr, no texture mapping, no illumination
+		1, // No depth correction, YpCbCr, no texture mapping, illumination
+		0, // No depth correction, YpCbCr, texture mapping, no illumination
+		1, // No depth correction, YpCbCr, texture mapping, illumination
+		0, // Depth correction, RGB, no texture mapping, no illumination
+		1, // Depth correction, RGB, no texture mapping, illumination
+		0, // Depth correction, RGB, texture mapping, no illumination
+		1, // Depth correction, RGB, texture mapping, illumination
+		0, // Depth correction, YpCbCr, no texture mapping, no illumination
+		1, // Depth correction, YpCbCr, no texture mapping, illumination
+		0, // Depth correction, YpCbCr, texture mapping, no illumination
+		1  // Depth correction, YpCbCr, texture mapping, illumination
+		};
+	std::pair<GLShaderManager::Namespace&,bool> cnsr=contextData.getShaderManager()->createNamespace("Kinect/Projector2",16,numShaderUniforms,numShaderVersionNumbers);
+	
 	/* Create and register the data item: */
-	DataItem* dataItem=new DataItem;
+	DataItem* dataItem=new DataItem(cnsr.first);
 	contextData.addDataItem(this,dataItem);
 	
 	/* Create the template vertex buffer: */
@@ -629,18 +673,12 @@ void Projector2::setMapTexture(bool newMapTexture)
 	{
 	/* Set the texture mapping flag: */
 	mapTexture=newMapTexture;
-	
-	/* Invalidate the rendering shader: */
-	++renderingShaderSettingsVersion;
 	}
 
 void Projector2::setIlluminate(bool newIlluminate)
 	{
 	/* Set the illumination flag: */
 	illuminate=newIlluminate;
-	
-	/* Invalidate the rendering shader: */
-	++renderingShaderSettingsVersion;
 	}
 
 void Projector2::processDepthFrame(const FrameBuffer& depthFrame,MeshBuffer& meshBuffer) const
@@ -1013,17 +1051,32 @@ void Projector2::glRenderAction(GLContextData& contextData) const
 	glPushAttrib(GL_ENABLE_BIT);
 	glDisable(GL_CULL_FACE);
 	
+	/* Determine which version of the facade rendering shader to use: */
+	unsigned int shaderIndex=0x0U;
+	if(depthCorrection!=0)
+		shaderIndex|=0x8U;
+	if(colorSpace==FrameSource::YPCBCR)
+		shaderIndex|=0x4U;
+	if(mapTexture)
+		shaderIndex|=0x2U;
+	if(illuminate)
+		shaderIndex|=0x1U;
+	
 	/* Check if the facade rendering shader is outdated: */
+	GLShaderManager::Namespace& sns=dataItem->shaderNamespace;
 	GLLightTracker* lightTracker=contextData.getLightTracker();
-	if(dataItem->renderingShaderSettingsVersion!=renderingShaderSettingsVersion||dataItem->lightStateVersion!=lightTracker->getVersion())
+	unsigned int ltVersion[1];
+	ltVersion[0]=lightTracker->getVersion();
+	if(sns.getShader(shaderIndex)==GLhandleARB(0)||sns.isOutdated(shaderIndex,ltVersion))
 		{
-		/* Rebuild the facade rendering shader: */
-		buildRenderingShader(dataItem,lightTracker);
+		/* (Re-)build the facade rendering shader: */
+		buildRenderingShader(sns,shaderIndex,lightTracker);
+		sns.markUpToDate(shaderIndex,ltVersion);
 		}
 	
 	/* Activate the facade rendering shader: */
-	dataItem->renderingShader.useProgram();
-	int* rsuPtr=dataItem->renderingShaderUniforms;
+	sns.useShader(shaderIndex);
+	unsigned int variableIndex=0;
 	
 	/* Bind the vertex and index buffers: */
 	typedef GLVertex<GLfloat,2,void,0,void,GLfloat,3> Vertex;
@@ -1048,20 +1101,25 @@ void Projector2::glRenderAction(GLContextData& contextData) const
 		/* Mark the cached mesh as valid: */
 		dataItem->meshVersion=meshVersion;
 		}
-	glUniformARB(*(rsuPtr++),0);
+	sns.uniform(shaderIndex,variableIndex++,0);
 	
 	if(depthCorrection!=0)
 		{
 		/* Bind the depth correction texture: */
 		glActiveTextureARB(GL_TEXTURE1_ARB);
 		glBindTexture(GL_TEXTURE_RECTANGLE_ARB,dataItem->depthCorrectionTextureId);
-		glUniformARB(*(rsuPtr++),1);
+		sns.uniform(shaderIndex,variableIndex++,1);
 		}
 	
 	if(mapTexture)
 		{
 		/* Upload the color projection matrix: */
-		glUniformARB(*(rsuPtr++),intrinsicParameters.colorProjection);
+		glUniformARB(sns.getUniformLocation(shaderIndex,variableIndex++),intrinsicParameters.colorProjection);
+		}
+	else
+		{
+		/* Set a blue-ish default color: */
+		glColor3f(0.3f,0.5f,1.0f);
 		}
 	
 	if(illuminate)
@@ -1069,12 +1127,14 @@ void Projector2::glRenderAction(GLContextData& contextData) const
 		/* Set surface material properties (this should be done by caller, ideally): */
 		if(mapTexture)
 			{
+			/* Set a diffuse-only white material: */
 			glMaterialAmbientAndDiffuse(GLMaterialEnums::FRONT_AND_BACK,GLColor<GLfloat,4>(1.0f,1.0f,1.0f));
 			glMaterialSpecular(GLMaterialEnums::FRONT_AND_BACK,GLColor<GLfloat,4>(0.0f,0.0f,0.0f));
 			glMaterialShininess(GLMaterialEnums::FRONT_AND_BACK,0.0f);
 			}
 		else
 			{
+			/* Set a highly specular blue-ish material: */
 			glMaterialAmbientAndDiffuse(GLMaterialEnums::FRONT_AND_BACK,GLColor<GLfloat,4>(0.3f,0.5f,1.0f));
 			glMaterialSpecular(GLMaterialEnums::FRONT_AND_BACK,GLColor<GLfloat,4>(1.0f,1.0f,1.0f));
 			glMaterialShininess(GLMaterialEnums::FRONT_AND_BACK,128.0f);
@@ -1083,7 +1143,7 @@ void Projector2::glRenderAction(GLContextData& contextData) const
 		/* Calculate and upload the depth projection matrix from depth image space to eye space: */
 		PTransform fullDP=glGetModelviewMatrix<GLfloat>();
 		fullDP*=worldDepthProjection;
-		glUniformARB(*(rsuPtr++),fullDP);
+		glUniformARB(sns.getUniformLocation(shaderIndex,variableIndex++),fullDP);
 		
 		/* Calculate and upload the transposed inverse depth projection matrix from depth image space to eye space: */
 		PTransform invFullDP=Geometry::invert(fullDP);
@@ -1091,7 +1151,7 @@ void Projector2::glRenderAction(GLContextData& contextData) const
 		for(int i=0;i<4;++i)
 			for(int j=i+1;j<4;++j)
 				std::swap(ifdpm(i,j),ifdpm(j,i));
-		glUniformARB(*(rsuPtr++),invFullDP);
+		glUniformARB(sns.getUniformLocation(shaderIndex,variableIndex++),invFullDP);
 		}
 	else
 		{
@@ -1099,7 +1159,7 @@ void Projector2::glRenderAction(GLContextData& contextData) const
 		PTransform fullDP=glGetProjectionMatrix<GLfloat>();
 		fullDP*=glGetModelviewMatrix<GLfloat>();
 		fullDP*=worldDepthProjection;
-		glUniformARB(*(rsuPtr++),fullDP);
+		glUniformARB(sns.getUniformLocation(shaderIndex,variableIndex++),fullDP);
 		}
 	
 	if(mapTexture)
@@ -1118,7 +1178,7 @@ void Projector2::glRenderAction(GLContextData& contextData) const
 			/* Mark the cached color frame as up-to-date: */
 			dataItem->colorFrameVersion=colorFrameVersion;
 			}
-		glUniformARB(*(rsuPtr++),2);
+		sns.uniform(shaderIndex,variableIndex++,2);
 		}
 	
 	/* Draw the cached indexed triangle set: */
@@ -1143,7 +1203,7 @@ void Projector2::glRenderAction(GLContextData& contextData) const
 	glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB,0);
 	
 	/* Disable the facade rendering shader: */
-	GLShader::disablePrograms();
+	sns.disableShaders();
 	
 	/* Restore OpenGL state: */
 	glPopAttrib();

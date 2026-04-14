@@ -401,3 +401,4 @@ Kinect-6.0:
 - Fixed up Kinect/CameraOrbbecDummy.cpp.
 - Removed unused code from PointPlaneTool.
 - Improved output format in MeasurementTool.
+- Use GLShaderManager to share and manage GLSL shaders in Projector2.

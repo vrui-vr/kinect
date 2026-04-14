@@ -32,7 +32,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Threads/TripleBuffer.h>
 #include <GL/gl.h>
 #include <GL/GLObject.h>
-#include <GL/GLShader.h>
+#include <GL/GLShaderManager.h>
 #include <Kinect/FrameBuffer.h>
 #include <Kinect/MeshBuffer.h>
 #include <Kinect/ProjectorBase.h>
@@ -64,13 +64,10 @@ class Projector2:public ProjectorBase,public GLObject
 		unsigned int meshVersion; // Version number of mesh currently in depth texture / index buffer
 		GLuint colorTextureId; // ID of texture object holding the current color frame
 		unsigned int colorFrameVersion; // Version number of color currently in texture object
-		GLShader renderingShader; // The facade rendering shader
-		unsigned int renderingShaderSettingsVersion; // Version number of settings built into the current rendering shader
-		unsigned int lightStateVersion; // Version number of OpenGL lighting state
-		int renderingShaderUniforms[6]; // The uniform variable locations of the facade rendering shader
+		GLShaderManager::Namespace& shaderNamespace; // Namespace to share rendering shaders between multiple objects of this class
 		
 		/* Constructors and destructors: */
-		DataItem(void);
+		DataItem(GLShaderManager::Namespace& sShaderNamespace);
 		virtual ~DataItem(void);
 		};
 	
@@ -85,7 +82,6 @@ class Projector2:public ProjectorBase,public GLObject
 	mutable GLfloat* spatialFilterBuffer; // Intermediate buffer to filter depth frames spatially
 	bool mapTexture; // Flag whether to map the color texture onto the 3D geometry, or render as raw lit surfaces
 	bool illuminate; // Flag whether to illuminate the 3D geometry from all active light sources
-	unsigned int renderingShaderSettingsVersion; // Version number of rendering shader settings
 	int quadCaseVertexOffsets[16][6]; // Offsets of triangle vertices to be used for each quad corner validity case
 	Threads::Thread depthFrameProcessingThread; // Background thread to process incoming depth frames for rendering
 	Threads::TripleBuffer<std::pair<FrameBuffer,MeshBuffer> > meshes; // Triple buffer of meshes ready for rendering
@@ -96,7 +92,7 @@ class Projector2:public ProjectorBase,public GLObject
 	
 	/* Private methods: */
 	void* depthFrameProcessingThreadMethod(void); // Thread method for background depth frame processing
-	void buildRenderingShader(DataItem* dataItem,GLLightTracker* lightTracker) const; // Builds the rendering shader based on current settings or OpenGL state
+	void buildRenderingShader(GLShaderManager::Namespace& shaderNamespace,unsigned int shaderIndex,GLLightTracker* lightTracker) const; // Builds the rendering shader based on current settings or OpenGL state
 	
 	/* Constructors and destructors: */
 	public:
@@ -106,7 +102,6 @@ class Projector2:public ProjectorBase,public GLObject
 	
 	/* Methods from class ProjectorBase: */
 	virtual void setDepthFrameSize(const Size& newDepthFrameSize);
-	virtual void setColorSpace(FrameSource::ColorSpace newColorSpace);
 	
 	/* Methods from class GLObject: */
 	virtual void initContext(GLContextData& contextData) const;
