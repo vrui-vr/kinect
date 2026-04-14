@@ -425,17 +425,19 @@ void Projector2::buildRenderingShader(GLShaderManager::Namespace& shaderNamespac
 	shaderNamespace.setUniformLocation(shaderIndex,variableIndex++,"depthSampler");
 	if(depthCorrection!=0)
 		shaderNamespace.setUniformLocation(shaderIndex,variableIndex++,"depthCorrectionSampler");
-	if(mapTexture)
-		shaderNamespace.setUniformLocation(shaderIndex,variableIndex++,"colorProjection");
 	shaderNamespace.setUniformLocation(shaderIndex,variableIndex++,"depthProjection");
 	if(illuminate)
 		shaderNamespace.setUniformLocation(shaderIndex,variableIndex++,"inverseTransposedDepthProjection");
 	if(mapTexture)
+		{
+		shaderNamespace.setUniformLocation(shaderIndex,variableIndex++,"colorProjection");
 		shaderNamespace.setUniformLocation(shaderIndex,variableIndex++,"colorSampler");
+		}
 	}
 
 Projector2::Projector2(void)
-	:inDepthFrameVersion(0),
+	:colorLensDistortion(false),
+	 inDepthFrameVersion(0),
 	 filterDepthFrames(false),lowpassDepthFrames(false),filteredDepthFrame(0),spatialFilterBuffer(0),
 	 mapTexture(true),illuminate(false),
 	 meshVersion(0),colorFrameVersion(0)
@@ -445,6 +447,7 @@ Projector2::Projector2(void)
 Projector2::Projector2(FrameSource& frameSource)
 	:ProjectorBase(frameSource),
 	 GLObject(false),
+	 colorLensDistortion(!intrinsicParameters.colorLensDistortion.isIdentity()),
 	 inDepthFrameVersion(0),
 	 filterDepthFrames(false),lowpassDepthFrames(false),filteredDepthFrame(0),spatialFilterBuffer(0),
 	 mapTexture(true),illuminate(false),
@@ -505,48 +508,37 @@ void Projector2::setDepthFrameSize(const Size& newDepthFrameSize)
 	quadCaseVertexOffsets[0xf][5]=depthSize[0]+1;
 	}
 
+void Projector2::setIntrinsicParameters(const FrameSource::IntrinsicParameters& ips)
+	{
+	/* Call the base class method: */
+	ProjectorBase::setIntrinsicParameters(ips);
+	
+	/* Check if color images need to be distortion-corrected before texture mapping: */
+	colorLensDistortion=!intrinsicParameters.colorLensDistortion.isIdentity();
+	}
+
 void Projector2::initContext(GLContextData& contextData) const
 	{
 	/* Create a namespace to hold the GLSL rendering shader: */
-	static const unsigned int numShaderUniforms[16]=
+	unsigned int numShaderUniforms[32];
+	unsigned int numShaderVersionNumbers[32];
+	for(int i=0;i<32;++i)
 		{
-		2, // No depth correction, RGB, no texture mapping, no illumination
-		3, // No depth correction, RGB, no texture mapping, illumination
-		4, // No depth correction, RGB, texture mapping, no illumination
-		5, // No depth correction, RGB, texture mapping, illumination
-		2, // No depth correction, YpCbCr, no texture mapping, no illumination
-		3, // No depth correction, YpCbCr, no texture mapping, illumination
-		4, // No depth correction, YpCbCr, texture mapping, no illumination
-		5, // No depth correction, YpCbCr, texture mapping, illumination
-		3, // Depth correction, RGB, no texture mapping, no illumination
-		4, // Depth correction, RGB, no texture mapping, illumination
-		5, // Depth correction, RGB, texture mapping, no illumination
-		6, // Depth correction, RGB, texture mapping, illumination
-		3, // Depth correction, YpCbCr, no texture mapping, no illumination
-		4, // Depth correction, YpCbCr, no texture mapping, illumination
-		5, // Depth correction, YpCbCr, texture mapping, no illumination
-		6  // Depth correction, YpCbCr, texture mapping, illumination
-		};
-	static const unsigned int numShaderVersionNumbers[16]=
-		{
-		0, // No depth correction, RGB, no texture mapping, no illumination
-		1, // No depth correction, RGB, no texture mapping, illumination
-		0, // No depth correction, RGB, texture mapping, no illumination
-		1, // No depth correction, RGB, texture mapping, illumination
-		0, // No depth correction, YpCbCr, no texture mapping, no illumination
-		1, // No depth correction, YpCbCr, no texture mapping, illumination
-		0, // No depth correction, YpCbCr, texture mapping, no illumination
-		1, // No depth correction, YpCbCr, texture mapping, illumination
-		0, // Depth correction, RGB, no texture mapping, no illumination
-		1, // Depth correction, RGB, no texture mapping, illumination
-		0, // Depth correction, RGB, texture mapping, no illumination
-		1, // Depth correction, RGB, texture mapping, illumination
-		0, // Depth correction, YpCbCr, no texture mapping, no illumination
-		1, // Depth correction, YpCbCr, no texture mapping, illumination
-		0, // Depth correction, YpCbCr, texture mapping, no illumination
-		1  // Depth correction, YpCbCr, texture mapping, illumination
-		};
-	std::pair<GLShaderManager::Namespace&,bool> cnsr=contextData.getShaderManager()->createNamespace("Kinect/Projector2",16,numShaderUniforms,numShaderVersionNumbers);
+		numShaderUniforms[i]=2; // Depth texture sampler and depth unprojection matrix
+		numShaderVersionNumbers[i]=0;
+		if((i&0x1U)!=0x0U) // Illumination
+			{
+			++numShaderUniforms[i]; // Transposed inverse of depth unprojection matrix
+			++numShaderVersionNumbers[i];
+			}
+		if((i&0x2U)!=0x0U) // Texture mapping
+			numShaderUniforms[i]+=2; // Color image sampler and color projection matrix
+		if((i&0x8U)!=0x0U) // Color lens distortion correction
+			numShaderUniforms[i]+=2; // Lens distortion formula coefficients and tangent space-to-image space transformation
+		if((i&0x10U)!=0x0U) // Per-pixel depth correction
+			++numShaderUniforms[i]; // Depth correction texture sampler
+		}
+	std::pair<GLShaderManager::Namespace&,bool> cnsr=contextData.getShaderManager()->createNamespace("Kinect/Projector2",32,numShaderUniforms,numShaderVersionNumbers);
 	
 	/* Create and register the data item: */
 	DataItem* dataItem=new DataItem(cnsr.first);
@@ -1053,14 +1045,16 @@ void Projector2::glRenderAction(GLContextData& contextData) const
 	
 	/* Determine which version of the facade rendering shader to use: */
 	unsigned int shaderIndex=0x0U;
-	if(depthCorrection!=0)
-		shaderIndex|=0x8U;
-	if(colorSpace==FrameSource::YPCBCR)
-		shaderIndex|=0x4U;
-	if(mapTexture)
-		shaderIndex|=0x2U;
 	if(illuminate)
 		shaderIndex|=0x1U;
+	if(mapTexture)
+		shaderIndex|=0x2U;
+	if(colorSpace==FrameSource::YPCBCR)
+		shaderIndex|=0x4U;
+	if(colorLensDistortion)
+		shaderIndex|=0x8U;
+	if(depthCorrection!=0)
+		shaderIndex|=0x10U;
 	
 	/* Check if the facade rendering shader is outdated: */
 	GLShaderManager::Namespace& sns=dataItem->shaderNamespace;
@@ -1111,17 +1105,6 @@ void Projector2::glRenderAction(GLContextData& contextData) const
 		sns.uniform(shaderIndex,variableIndex++,1);
 		}
 	
-	if(mapTexture)
-		{
-		/* Upload the color projection matrix: */
-		glUniformARB(sns.getUniformLocation(shaderIndex,variableIndex++),intrinsicParameters.colorProjection);
-		}
-	else
-		{
-		/* Set a blue-ish default color: */
-		glColor3f(0.3f,0.5f,1.0f);
-		}
-	
 	if(illuminate)
 		{
 		/* Set surface material properties (this should be done by caller, ideally): */
@@ -1160,6 +1143,17 @@ void Projector2::glRenderAction(GLContextData& contextData) const
 		fullDP*=glGetModelviewMatrix<GLfloat>();
 		fullDP*=worldDepthProjection;
 		glUniformARB(sns.getUniformLocation(shaderIndex,variableIndex++),fullDP);
+		}
+	
+	if(mapTexture)
+		{
+		/* Upload the color projection matrix: */
+		glUniformARB(sns.getUniformLocation(shaderIndex,variableIndex++),intrinsicParameters.colorProjection);
+		}
+	else
+		{
+		/* Set a blue-ish default color: */
+		glColor3f(0.3f,0.5f,1.0f);
 		}
 	
 	if(mapTexture)

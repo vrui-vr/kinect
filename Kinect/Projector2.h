@@ -73,6 +73,7 @@ class Projector2:public ProjectorBase,public GLObject
 	
 	/* Elements: */
 	static const unsigned int quadCaseNumTriangles[16]; // Number of triangles to be generated for each quad corner validity case
+	bool colorLensDistortion; // Flag if color images need to be distortion-corrected before texture mapping
 	Threads::MutexCond inDepthFrameCond; // Condition variable to signal arrival of a new depth frame
 	unsigned int inDepthFrameVersion; // Version number of most-recently arrived raw depth frame
 	FrameBuffer inDepthFrame; // Most-recently arrived raw depth frame
@@ -102,6 +103,7 @@ class Projector2:public ProjectorBase,public GLObject
 	
 	/* Methods from class ProjectorBase: */
 	virtual void setDepthFrameSize(const Size& newDepthFrameSize);
+	virtual void setIntrinsicParameters(const FrameSource::IntrinsicParameters& ips);
 	
 	/* Methods from class GLObject: */
 	virtual void initContext(GLContextData& contextData) const;
