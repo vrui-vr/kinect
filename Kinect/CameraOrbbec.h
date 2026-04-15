@@ -70,7 +70,7 @@ class CameraOrbbec:public DirectFrameSource
 	
 	/* Private methods: */
 	void acquireSensors(void); // Acquires the selected Orbbec camera's depth and color sensors
-	static IntrinsicParameters::LensDistortion getLensDistortion(ob::VideoStreamProfile& profile); // Returns the lens distortion correction parameters of the given video stream profile
+	static IntrinsicParameters::LensDistortion getLensDistortion(ob::VideoStreamProfile& profile,bool flipX,bool flipY); // Returns the lens distortion correction parameters of the given video stream profile
 	void colorFrameCallback(std::shared_ptr<ob::Frame> frame); // Callback called when the color sensor delivers a new frame
 	void depthFrameCallback(std::shared_ptr<ob::Frame> frame); // Callback called when the depth sensor delivers a new frame
 	void initialize(void); // Initializes the object after an Orbbec device has been selected

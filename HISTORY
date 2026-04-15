@@ -402,3 +402,6 @@ Kinect-6.0:
 - Removed unused code from PointPlaneTool.
 - Improved output format in MeasurementTool.
 - Use GLShaderManager to share and manage GLSL shaders in Projector2.
+- Added color image distortion correction to Kinect::Projector2.
+- Experimented with intrinsic camera parameters in Kinect::CameraOrbbec
+  to optimize depth/color alignment.

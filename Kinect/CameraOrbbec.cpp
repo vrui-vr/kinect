@@ -137,7 +137,7 @@ void CameraOrbbec::acquireSensors(void)
 	sensorsAcquired=true;
 	}
 
-FrameSource::IntrinsicParameters::LensDistortion CameraOrbbec::getLensDistortion(ob::VideoStreamProfile& profile)
+FrameSource::IntrinsicParameters::LensDistortion CameraOrbbec::getLensDistortion(ob::VideoStreamProfile& profile,bool flipX,bool flipY)
 	{
 	/* Retrieve the profile's lens distortion correction parameters: */
 	OBCameraDistortion distortion=profile.getDistortion();
@@ -150,8 +150,8 @@ FrameSource::IntrinsicParameters::LensDistortion CameraOrbbec::getLensDistortion
 	result.setKappa(3,distortion.k4);
 	result.setKappa(4,distortion.k5);
 	result.setKappa(5,distortion.k6);
-	result.setRho(0,-distortion.p1); // Negate this because we flip depth and color frames vertically upon decoding
-	result.setRho(1,distortion.p2);
+	result.setRho(0,flipY?-distortion.p1:distortion.p1);
+	result.setRho(1,flipX?-distortion.p2:distortion.p2);
 	
 	return result;
 	}
@@ -217,8 +217,8 @@ void CameraOrbbec::depthFrameCallback(std::shared_ptr<ob::Frame> frame)
 void CameraOrbbec::initialize(void)
 	{
 	/* Set the default color and depth streaming formats: */
+	frameSizes[0]=Size(3840,2160);
 	// frameSizes[0]=Size(1920,1080);
-	frameSizes[0]=Size(1920,1080);
 	frameSizes[1]=Size(640,576);
 	fps=30;
 	
@@ -303,7 +303,7 @@ FrameSource::IntrinsicParameters CameraOrbbec::getIntrinsicParameters(void)
 		acquireSensors();
 	
 	/* Retrieve the depth sensor's lens distortion correction coefficients: */
-	result.depthLensDistortion=getLensDistortion(*depthProfile);
+	result.depthLensDistortion=getLensDistortion(*depthProfile,false,true);
 	
 	/* Create the transformation from depth image space to tangent space: */
 	OBCameraIntrinsic depthIntrinsics=depthProfile->getIntrinsic();
@@ -332,17 +332,17 @@ FrameSource::IntrinsicParameters CameraOrbbec::getIntrinsicParameters(void)
 	dMat(3,3)=b/a;
 	
 	/* Retrieve the color sensor's lens distortion correction coefficients: */
-	result.colorLensDistortion=getLensDistortion(*colorProfile);
+	result.colorLensDistortion=getLensDistortion(*colorProfile,true,true);
 	
 	/* Create the transformation from tangent space to color image space: */
 	OBCameraIntrinsic colorIntrinsics=colorProfile->getIntrinsic();
 	IntrinsicParameters::ATransform::Matrix& ct2iMat=result.ct2i.getMatrix();
-	ct2iMat(0,0)=-colorIntrinsics.fx;
+	ct2iMat(0,0)=-colorIntrinsics.fx/double(frameSizes[0][0]);
 	ct2iMat(0,1)=0.0;
-	ct2iMat(0,2)=colorIntrinsics.cx+0.5; // Add 0.5 because Orbbec SDK assumes pixels at integer positions
+	ct2iMat(0,2)=1.0-(colorIntrinsics.cx+0.5)/double(frameSizes[0][0]); // Add 0.5 because Orbbec SDK assumes pixels at integer positions
 	ct2iMat(1,0)=0.0;
-	ct2iMat(1,1)=-colorIntrinsics.fy;
-	ct2iMat(1,2)=double(frameSizes[0][1])-(colorIntrinsics.cy+0.5); // Invert because we flip the color frame, and add 0.5 because see above
+	ct2iMat(1,1)=-colorIntrinsics.fy/double(frameSizes[0][1]);
+	ct2iMat(1,2)=1.0-(colorIntrinsics.cy+0.5)/double(frameSizes[0][1]); // Invert because we flip the color frame, and add 0.5 because see above
 	
 	/* Calculate the inverse: */
 	result.ci2t=Geometry::invert(result.ct2i);
@@ -350,11 +350,10 @@ FrameSource::IntrinsicParameters CameraOrbbec::getIntrinsicParameters(void)
 	/* Create the projection from 3D camera space into color image space: */
 	IntrinsicParameters::PTransform::Matrix& cMat=result.colorProjection.getMatrix();
 	cMat=IntrinsicParameters::PTransform::Matrix::zero;
-	
-	cMat(0,0)=ct2iMat(0,0)/double(frameSizes[0][0]);
-	cMat(0,2)=ct2iMat(0,2)/double(frameSizes[0][0]);
-	cMat(1,1)=ct2iMat(1,1)/double(frameSizes[0][1]);
-	cMat(1,2)=ct2iMat(1,2)/double(frameSizes[0][1]);
+	cMat(0,0)=ct2iMat(0,0);
+	cMat(0,2)=ct2iMat(0,2);
+	cMat(1,1)=ct2iMat(1,1);
+	cMat(1,2)=ct2iMat(1,2);
 	cMat(2,3)=-1.0;
 	cMat(3,2)=1.0;
 	
@@ -368,6 +367,15 @@ FrameSource::IntrinsicParameters CameraOrbbec::getIntrinsicParameters(void)
 			dtcMat(i,j)=ext.rot[i*3+j];
 		dtcMat(i,3)=ext.trans[i]/10.0;
 		}
+	depthToColor*=IntrinsicParameters::PTransform::rotate(IntrinsicParameters::PTransform::Rotation::rotateZ(0.01));
+	#if 0
+	dtcMat(0,1)=-dtcMat(0,1);
+	dtcMat(1,0)=-dtcMat(1,0);
+	dtcMat(1,2)=-dtcMat(1,2);
+	dtcMat(1,3)=-dtcMat(1,3);
+	dtcMat(2,1)=-dtcMat(2,1);
+	dtcMat(3,1)=-dtcMat(3,1);
+	#endif
 	result.colorProjection*=depthToColor;
 	
 	/* Concatenate the depth un-projection matrix to transform directly from depth image space to color image space: */

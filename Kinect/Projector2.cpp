@@ -243,13 +243,42 @@ void Projector2::buildRenderingShader(GLShaderManager::Namespace& shaderNamespac
 		{
 		/* Add to vertex shader's declarations: */
 		vertexShaderDeclarations+="\
-			uniform mat4 colorProjection; // Projection from depth image space to color image space\n";
+			uniform mat4 colorProjection; // Projection from depth image space to color image space (or color tangent space in case of color lens distortion)\n";
 		
-		/* Add to vertex shader's main function: */
-		vertexShaderMain+="\
-				\n\
-				/* Project the pixel from depth image space to color image space: */\n\
-				gl_TexCoord[0]=colorProjection*diPixel;\n";
+		if(colorLensDistortion)
+			{
+			/* Add to vertex shader's declarations: */
+			vertexShaderDeclarations+="\
+				uniform float distortion[8]; // Color distortion correction formula coefficients\n\
+				uniform mat4 colorTangentToImage; // Projection from color tangent space to color image space\n";
+			
+			/* Add to vertex shader's main function: */
+			vertexShaderMain+="\
+					\n\
+					/* Project the pixel from depth image space to affine color tangent space: */\n\
+					vec4 ct=colorProjection*diPixel;\n\
+					vec2 cta=ct.xy/ct.w;\n\
+					\n\
+					/* Evaluate the lens distortion correction formula: */\n\
+					float r2=dot(cta,cta);\n\
+					float radial=(1.0+r2*(distortion[0]+r2*(distortion[1]+r2*distortion[2])))/\n\
+					             (1.0+r2*(distortion[3]+r2*(distortion[4]+r2*distortion[5])));\n\
+					vec4 ccta=vec4(cta.x*radial+2.0*distortion[6]*cta.x*cta.y+distortion[7]*(r2+2.0*cta.x*cta.x),\n\
+					               cta.y*radial+distortion[6]*(r2+2.0*cta.y*cta.y)+2.0*distortion[7]*cta.x*cta.y,\n\
+					               0.0,\n\
+					               1.0);\n\
+					\n\
+					/* Transform the distortion-corrected color tangent space point to color image space: */\n\
+					gl_TexCoord[0]=colorTangentToImage*ccta;\n";
+			}
+		else
+			{
+			/* Add to vertex shader's main function: */
+			vertexShaderMain+="\
+					\n\
+					/* Project the pixel from depth image space to color image space: */\n\
+					gl_TexCoord[0]=colorProjection*diPixel;\n";
+			}
 		}
 	
 	/* Check if illumination was requested: */
@@ -431,6 +460,11 @@ void Projector2::buildRenderingShader(GLShaderManager::Namespace& shaderNamespac
 	if(mapTexture)
 		{
 		shaderNamespace.setUniformLocation(shaderIndex,variableIndex++,"colorProjection");
+		if(colorLensDistortion)
+			{
+			shaderNamespace.setUniformLocation(shaderIndex,variableIndex++,"distortion");
+			shaderNamespace.setUniformLocation(shaderIndex,variableIndex++,"colorTangentToImage");
+			}
 		shaderNamespace.setUniformLocation(shaderIndex,variableIndex++,"colorSampler");
 		}
 	}
@@ -1147,17 +1181,48 @@ void Projector2::glRenderAction(GLContextData& contextData) const
 	
 	if(mapTexture)
 		{
-		/* Upload the color projection matrix: */
-		glUniformARB(sns.getUniformLocation(shaderIndex,variableIndex++),intrinsicParameters.colorProjection);
-		}
-	else
-		{
-		/* Set a blue-ish default color: */
-		glColor3f(0.3f,0.5f,1.0f);
-		}
-	
-	if(mapTexture)
-		{
+		if(colorLensDistortion)
+			{
+			/* Upload the color projection matrix to color tangent space: */
+			PTransform cProj=PTransform::identity;
+			cProj.getMatrix()(0,0)=intrinsicParameters.ci2t.getMatrix()(0,0);
+			cProj.getMatrix()(0,1)=intrinsicParameters.ci2t.getMatrix()(0,1);
+			cProj.getMatrix()(0,3)=intrinsicParameters.ci2t.getMatrix()(0,2);
+			cProj.getMatrix()(1,0)=intrinsicParameters.ci2t.getMatrix()(1,0);
+			cProj.getMatrix()(1,1)=intrinsicParameters.ci2t.getMatrix()(1,1);
+			cProj.getMatrix()(1,3)=intrinsicParameters.ci2t.getMatrix()(1,2);
+			cProj*=intrinsicParameters.colorProjection;
+			glUniformARB(sns.getUniformLocation(shaderIndex,variableIndex++),cProj);
+			
+			/* Upload the lens distortion correction formula's coefficients: */
+			float coefficients[8];
+			#if 1
+			for(int i=0;i<6;++i)
+				coefficients[i]=float(intrinsicParameters.colorLensDistortion.getKappa(i));
+			for(int i=0;i<2;++i)
+				coefficients[6+i]=float(intrinsicParameters.colorLensDistortion.getRho(i));
+			#else
+			for(int i=0;i<8;++i)
+				coefficients[i]=0.0f;
+			#endif
+			glUniform1fvARB(sns.getUniformLocation(shaderIndex,variableIndex++),8,coefficients);
+			
+			/* Upload the transformation from color tangent space to color image space: */
+			PTransform ct2i=PTransform::identity;
+			ct2i.getMatrix()(0,0)=intrinsicParameters.ct2i.getMatrix()(0,0);
+			ct2i.getMatrix()(0,1)=intrinsicParameters.ct2i.getMatrix()(0,1);
+			ct2i.getMatrix()(0,3)=intrinsicParameters.ct2i.getMatrix()(0,2);
+			ct2i.getMatrix()(1,0)=intrinsicParameters.ct2i.getMatrix()(1,0);
+			ct2i.getMatrix()(1,1)=intrinsicParameters.ct2i.getMatrix()(1,1);
+			ct2i.getMatrix()(1,3)=intrinsicParameters.ct2i.getMatrix()(1,2);
+			glUniformARB(sns.getUniformLocation(shaderIndex,variableIndex++),ct2i);
+			}
+		else
+			{
+			/* Upload the color projection matrix: */
+			glUniformARB(sns.getUniformLocation(shaderIndex,variableIndex++),intrinsicParameters.colorProjection);
+			}
+		
 		/* Bind the current color frame texture: */
 		glActiveTextureARB(GL_TEXTURE2_ARB);
 		glBindTexture(GL_TEXTURE_2D,dataItem->colorTextureId);
@@ -1173,6 +1238,11 @@ void Projector2::glRenderAction(GLContextData& contextData) const
 			dataItem->colorFrameVersion=colorFrameVersion;
 			}
 		sns.uniform(shaderIndex,variableIndex++,2);
+		}
+	else
+		{
+		/* Set a blue-ish default color: */
+		glColor3f(0.3f,0.5f,1.0f);
 		}
 	
 	/* Draw the cached indexed triangle set: */
