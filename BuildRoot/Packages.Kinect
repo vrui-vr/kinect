@@ -36,7 +36,7 @@ else
 endif
 
 # Orbbec's Orbbec SDK
-ORBBEC_BASEDIR = $(HOME)/ExternalSoftware/OrbbecSDK-1.10.5
+ORBBEC_BASEDIR = 
 ORBBEC_DEPENDS = 
 ORBBEC_INCLUDE = -I$(ORBBEC_BASEDIR)/include
 ORBBEC_LIBDIR  = -L$(ORBBEC_BASEDIR)/lib/linux_x64

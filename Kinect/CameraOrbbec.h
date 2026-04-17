@@ -24,14 +24,23 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #ifndef KINECT_CAMERAORBBEC_INCLUDED
 #define KINECT_CAMERAORBBEC_INCLUDED
 
-#include <libobsensor/ObSensor.hpp>
+#include <memory>
 #include <Misc/SizedTypes.h>
 #include <Misc/Autopointer.h>
+#include <Kinect/Config.h>
 #include <Kinect/DirectFrameSource.h>
 
 /* Forward declarations: */
 namespace Video {
 class ImageExtractor;
+}
+namespace ob {
+class Device;
+class Sensor;
+class StreamProfile;
+class VideoStreamProfile;\
+class Frame;
+class DepthFrame;
 }
 namespace Kinect {
 class OrbbecSDKContext;
@@ -53,8 +62,10 @@ class CameraOrbbec:public DirectFrameSource
 	typedef Misc::UInt16 ObDepthPixel; // Type for raw depth values received from an Orbbec depth sensor
 	
 	/* Elements: */
+	#if KINECT_CONFIG_HAVE_ORBBECSDK
 	static const char* pixelFormats[OB_FORMAT_UNKNOWN+1-OB_FORMAT_YUYV]; // List of video stream pixel formats defined by the Orbbec SDK, to automatically create color frame converters
 	OrbbecSDKContextPtr context; // Pointer to the Orbbec SDK context shared by all Orbbec cameras connected to the host
+	#endif
 	DevicePtr device; // The device from which to stream data
 	Size frameSizes[2]; // Requested size for streamed color and depth frames, respectively
 	unsigned int fps; // Requested frame rate for depth and color frames

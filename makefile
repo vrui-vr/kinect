@@ -251,6 +251,7 @@ $(DEPDIR)/Configure-Kinect: $(DEPDIR)/Configure-Begin
 	@cp Kinect/Config.h.template Kinect/Config.h.temp
 	@$(call CONFIG_SETVAR,Kinect/Config.h.temp,KINECT_CONFIG_HAVE_KINECTV2,$(SYSTEM_HAVE_LIBJPEG))
 	@$(call CONFIG_SETVAR,Kinect/Config.h.temp,KINECT_CONFIG_HAVE_LIBREALSENSE,$(SYSTEM_HAVE_REALSENSE))
+	@$(call CONFIG_SETVAR,Kinect/Config.h.temp,KINECT_CONFIG_HAVE_ORBBECSDK,$(SYSTEM_HAVE_ORBBEC))
 	@$(call CONFIG_SETVAR,Kinect/Config.h.temp,KINECT_CONFIG_USE_PROJECTOR2,$(KINECT_USE_PROJECTOR2))
 	@$(call CONFIG_SETVAR,Kinect/Config.h.temp,KINECT_CONFIG_USE_SHADERPROJECTOR,$(KINECT_USE_SHADERPROJECTOR))
 	@if ! diff -qN Kinect/Config.h.temp Kinect/Config.h > /dev/null ; then cp Kinect/Config.h.temp Kinect/Config.h ; fi

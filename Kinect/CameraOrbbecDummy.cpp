@@ -36,7 +36,7 @@ void CameraOrbbec::acquireSensors(void)
 	/* Never called */
 	}
 
-FrameSource::IntrinsicParameters::LensDistortion CameraOrbbec::getLensDistortion(ob::VideoStreamProfile& profile)
+FrameSource::IntrinsicParameters::LensDistortion CameraOrbbec::getLensDistortion(ob::VideoStreamProfile& profile,bool flipX,bool flipY)
 	{
 	/* Never called */
 	return FrameSource::IntrinsicParameters::LensDistortion();

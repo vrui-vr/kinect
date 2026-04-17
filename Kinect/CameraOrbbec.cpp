@@ -32,6 +32,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Video/VideoDataFormat.h>
 #include <Video/FrameBuffer.h>
 #include <Video/ImageExtractor.h>
+#include <libobsensor/ObSensor.hpp>
 #include <Kinect/FrameBuffer.h>
 #include <Kinect/Internal/OrbbecSDKContext.h>
 
