@@ -25,6 +25,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 
 #include <functional>
 #include <libobsensor/hpp/Version.hpp>
+#include <libobsensor/hpp/Device.hpp>
 #include <libobsensor/hpp/Context.hpp>
 #include <Misc/MessageLogger.h>
 
@@ -75,7 +76,7 @@ void OrbbecSDKContext::ref(void)
 	/* Increment the reference counter and check if it was zero before: */
 	if((refCount++)==0)
 		{
-		#if 1
+		#if 0
 		
 		/* Print basic SDK info: */
 		Misc::formattedLogNote("Kinect::OrbbecSDKContext: SDK version %d.%d.%d",ob::Version::getMajor(),ob::Version::getMinor(),ob::Version::getPatch());
@@ -84,7 +85,7 @@ void OrbbecSDKContext::ref(void)
 		#endif
 		
 		// DEBUGGING
-		std::cout<<"Kinect::OrbbecSDKContext: Creating Orbbec SDK context"<<std::endl;
+		// std::cout<<"Kinect::OrbbecSDKContext: Creating Orbbec SDK context"<<std::endl;
 		
 		/* Initialize the Orbbec SDK context: */
 		ob::Context::setLoggerSeverity(OB_LOG_SEVERITY_OFF);
@@ -92,7 +93,7 @@ void OrbbecSDKContext::ref(void)
 		context=new ob::Context;
 		
 		// DEBUGGING
-		std::cout<<"Kinect::OrbbecSDKContext: Orbbec SDK context has been created"<<std::endl;
+		// std::cout<<"Kinect::OrbbecSDKContext: Orbbec SDK context has been created"<<std::endl;
 		}
 	}
 
@@ -107,14 +108,14 @@ void OrbbecSDKContext::unref(void)
 	if((--refCount)==0)
 		{
 		// DEBUGGING
-		std::cout<<"Kinect::OrbbecSDKContext: Destroying Orbbec SDK context"<<std::endl;
+		// std::cout<<"Kinect::OrbbecSDKContext: Destroying Orbbec SDK context"<<std::endl;
 		
 		/* Destroy the Orbbec SDK context: */
 		delete context;
 		context=0;
 		
 		// DEBUGGING
-		std::cout<<"Kinect::OrbbecSDKContext: Orbbec SDK context has been destroyed"<<std::endl;
+		// std::cout<<"Kinect::OrbbecSDKContext: Orbbec SDK context has been destroyed"<<std::endl;
 		}
 	
 	#endif

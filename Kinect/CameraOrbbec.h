@@ -62,10 +62,7 @@ class CameraOrbbec:public DirectFrameSource
 	typedef Misc::UInt16 ObDepthPixel; // Type for raw depth values received from an Orbbec depth sensor
 	
 	/* Elements: */
-	#if KINECT_CONFIG_HAVE_ORBBECSDK
-	static const char* pixelFormats[OB_FORMAT_UNKNOWN+1-OB_FORMAT_YUYV]; // List of video stream pixel formats defined by the Orbbec SDK, to automatically create color frame converters
 	OrbbecSDKContextPtr context; // Pointer to the Orbbec SDK context shared by all Orbbec cameras connected to the host
-	#endif
 	DevicePtr device; // The device from which to stream data
 	Size frameSizes[2]; // Requested size for streamed color and depth frames, respectively
 	unsigned int fps; // Requested frame rate for depth and color frames

@@ -38,16 +38,16 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 
 namespace Kinect {
 
-/*************************************
-Static elements of class CameraOrbbec:
-*************************************/
+namespace {
 
-const char* CameraOrbbec::pixelFormats[OB_FORMAT_UNKNOWN+1-OB_FORMAT_YUYV]=
+static const char* obPixelFormats[OB_FORMAT_Y12C4+1-OB_FORMAT_YUYV]= // List of video stream pixel formats defined by the Orbbec SDK, to automatically create color frame converters
 	{
-	"YUYV","YUY2","UYVY","NV12","NV21","MJPG","H264","H265","Y16","Y8","Y10","Y12","GRAY","HEVC","I420",
-	"ACCL","GYRO","PNT ","RGBP","RLE","RGB","BGR","Y14","BGRA","COMP","RVL","Z16","YV12","BA81",
-	"RGBA","BYR2","RW16","DS16","UNKNOWN"
+	"YUYV","YUY2","UYVY","NV12","NV21","MJPG","H264","H265","Y16","Y8","Y10","Y11","Y12","GRAY","HEVC","I420",
+	"ACCL","GYRO","INVD","PNT ","RGBP","RLE","RGB8","BGR8","Y14","BGRA","COMP","RVL","Z16","YV12","BA81",
+	"RGBA","BYR2","RW16","Y12C"
 	};
+
+}
 
 /*****************************
 Methods of class CameraOrbbec:
@@ -82,7 +82,7 @@ void CameraOrbbec::acquireSensors(void)
 			VideoStreamProfilePtr vsp=cspList->getProfile(streamProfileIndex)->as<ob::VideoStreamProfile>();
 			
 			/* Check if the profile matches: */
-			if(vsp->type()==OB_STREAM_COLOR&&vsp->width()==frameSizes[0][0]&&vsp->height()==frameSizes[0][1]&&vsp->fps()==fps)
+			if(vsp->type()==OB_STREAM_COLOR&&vsp->width()==frameSizes[0][0]&&vsp->height()==frameSizes[0][1]&&vsp->fps()==fps&&vsp->format()==OB_FORMAT_MJPG)
 				{
 				colorProfile=vsp;
 				break;
@@ -406,7 +406,7 @@ void CameraOrbbec::startStreaming(void)
 		{
 		/* Create a video data format descriptor for the color sensor's selected profile: */
 		Video::VideoDataFormat videoDataFormat;
-		videoDataFormat.setPixelFormat(pixelFormats[colorProfile->format()-OB_FORMAT_YUYV]);
+		videoDataFormat.setPixelFormat(obPixelFormats[colorProfile->format()-OB_FORMAT_YUYV]);
 		videoDataFormat.size=frameSizes[0];
 		videoDataFormat.frameInterval=Math::Rational(1,fps);
 		
