@@ -24,8 +24,17 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 
 #include <string>
 #include <Misc/StdError.h>
+#include <Threads/RefCounted.h>
 
 namespace Kinect {
+
+/***************************************
+Dummy version of class OrbbecSDKContext:
+***************************************/
+
+class OrbbecSDKContext:public Threads::RefCounted
+	{
+	};
 
 /*****************************
 Methods of class CameraOrbbec:
