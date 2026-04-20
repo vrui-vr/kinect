@@ -409,3 +409,4 @@ Kinect-6.0:
   - Added configuration for Orbbec to makefile.
 - Fixed Kinect/CameraOrbbec.h to work if Orbbec SDK not installed.
 - Adapted Kinect::CameraOrbbec to work with version 2 of the Orbbec SDK.
+- Adapted to new Vrui kernel types and functions.

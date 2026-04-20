@@ -900,7 +900,7 @@ void KinectViewer::display(GLContextData& contextData) const
 void KinectViewer::resetNavigation(void)
 	{
 	/* Calculate a bounding box around all projectors' points of interests: */
-	Geometry::Box<Vrui::Scalar,3> bbox=Geometry::Box<Vrui::Scalar,3>::empty;
+	Vrui::Box bbox=Vrui::Box::empty;
 	for(std::vector<KinectStreamer*>::iterator sIt=streamers.begin();sIt!=streamers.end();++sIt)
 		{
 		/* Calculate the world position of a point 1m in front of the streamer's projector: */
@@ -923,8 +923,8 @@ void KinectViewer::resetNavigation(void)
 		bbox.addPoint(wp+ws);
 		}
 	
-	/* Center the resulting box in the view: */
-	Vrui::setNavigationTransformation(Geometry::mid(bbox.min,bbox.max),Math::div2(Geometry::dist(bbox.min,bbox.max)));
+	/* Center the resulting box in the view and make the Y axis point up and the X axis to point right: */
+	Vrui::setNavigationTransformation(bbox,Vrui::Vector(0,1,0),Vrui::Vector(1,0,0));
 	}
 
 void KinectViewer::eventCallback(EventID eventId,Vrui::InputDevice::ButtonCallbackData* cbData)
