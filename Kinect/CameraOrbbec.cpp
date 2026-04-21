@@ -211,6 +211,9 @@ void CameraOrbbec::depthFrameCallback(std::shared_ptr<ob::Frame> frame)
 			*dPtr=*sPtr>=min&&*sPtr<=max?FrameSource::DepthPixel(b-a/float(*sPtr)+0.5f):FrameSource::invalidDepth;
 		}
 	
+	/* Handle background capture and removal: */
+	processDepthFrameBackground(depthFrame);
+	
 	/* Call the depth streaming callback with the quantized frame: */
 	(*depthStreamingCallback)(depthFrame);
 	}
@@ -218,8 +221,8 @@ void CameraOrbbec::depthFrameCallback(std::shared_ptr<ob::Frame> frame)
 void CameraOrbbec::initialize(void)
 	{
 	/* Set the default color and depth streaming formats: */
-	frameSizes[0]=Size(3840,2160);
-	// frameSizes[0]=Size(1920,1080);
+	// frameSizes[0]=Size(3840,2160);
+	frameSizes[0]=Size(1920,1080);
 	frameSizes[1]=Size(640,576);
 	fps=30;
 	
