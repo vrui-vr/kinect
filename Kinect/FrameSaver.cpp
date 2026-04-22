@@ -2,7 +2,7 @@
 FrameSaver - Helper class to save raw color and video frames from a
 Kinect camera to a time-stamped file on disk for playback and further
 processing.
-Copyright (c) 2010-2025 Oliver Kreylos
+Copyright (c) 2010-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -49,7 +49,7 @@ Methods of class FrameSaver:
 void FrameSaver::initialize(FrameSource& frameSource)
 	{
 	/* Write the file formats' version numbers to the depth and color files: */
-	colorFrameFile->write<Misc::UInt32>(2);
+	colorFrameFile->write<Misc::UInt32>(3);
 	depthFrameFile->write<Misc::UInt32>(6);
 	
 	/* Write the frame source's depth correction parameters: */
@@ -82,6 +82,8 @@ void FrameSaver::initialize(FrameSource& frameSource)
 	FrameSource::IntrinsicParameters ips=frameSource.getIntrinsicParameters();
 	FrameSource::IntrinsicParameters::writeLensDistortion(ips.colorLensDistortion,*colorFrameFile);
 	Misc::Marshaller<FrameSource::IntrinsicParameters::PTransform>::write(ips.colorProjection,*colorFrameFile);
+	if(!ips.colorLensDistortion.isIdentity())
+		Misc::Marshaller<FrameSource::IntrinsicParameters::ATransform>::write(ips.ct2i,*colorFrameFile);
 	FrameSource::IntrinsicParameters::writeLensDistortion(ips.depthLensDistortion,*depthFrameFile);
 	Misc::Marshaller<FrameSource::IntrinsicParameters::PTransform>::write(ips.depthProjection,*depthFrameFile);
 	

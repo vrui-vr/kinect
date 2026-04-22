@@ -371,15 +371,10 @@ FrameSource::IntrinsicParameters CameraOrbbec::getIntrinsicParameters(void)
 			dtcMat(i,j)=ext.rot[i*3+j];
 		dtcMat(i,3)=ext.trans[i]/10.0;
 		}
+	
+	/* Empirical correction for sub-optimal calibration on my camera, OB-CL8K14100BB: */
 	depthToColor*=IntrinsicParameters::PTransform::rotate(IntrinsicParameters::PTransform::Rotation::rotateZ(0.01));
-	#if 0
-	dtcMat(0,1)=-dtcMat(0,1);
-	dtcMat(1,0)=-dtcMat(1,0);
-	dtcMat(1,2)=-dtcMat(1,2);
-	dtcMat(1,3)=-dtcMat(1,3);
-	dtcMat(2,1)=-dtcMat(2,1);
-	dtcMat(3,1)=-dtcMat(3,1);
-	#endif
+	
 	result.colorProjection*=depthToColor;
 	
 	/* Concatenate the depth un-projection matrix to transform directly from depth image space to color image space: */

@@ -97,6 +97,12 @@ void FileFrameSource::initialize(void)
 	
 	/* Calculate the image-space transformations: */
 	intrinsicParameters.updateTransforms();
+	if(fileFormatVersions[0]>=3&&!intrinsicParameters.colorLensDistortion.isIdentity())
+		{
+		/* Read the color stream's tangent space-to-image transformation: */
+		intrinsicParameters.ct2i=Misc::Marshaller<IntrinsicParameters::ATransform>::read(*colorFrameFile);
+		intrinsicParameters.ci2t=Geometry::invert(intrinsicParameters.ct2i);
+		}
 	
 	/* Read the camera transformation from the depth file: */
 	extrinsicParameters=Misc::Marshaller<ExtrinsicParameters>::read(*depthFrameFile);

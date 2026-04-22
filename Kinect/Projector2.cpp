@@ -957,6 +957,16 @@ void Projector2::processDepthFrame(const FrameBuffer& depthFrame,MeshBuffer& mes
 	valid depth range.
 	*******************************************************************/
 	
+	#if 1
+	
+	unsigned int offsets[4];
+	offsets[0]=0U;
+	offsets[1]=1U;
+	offsets[2]=depthSize[0];
+	offsets[3]=depthSize[0]+1U;
+	
+	#endif
+	
 	/* Iterate through all quads and generate triangles: */
 	FrameSource::DepthPixel tdr=triangleDepthRange; // Get the currently set triangle depth range
 	meshBuffer.numTriangles=0;
@@ -969,6 +979,8 @@ void Projector2::processDepthFrame(const FrameBuffer& depthFrame,MeshBuffer& mes
 		GLuint index=rowIndex;
 		for(unsigned int x=1;x<depthSize[0];++x,++dfPtr,++index)
 			{
+			#if 0
+			
 			/* Calculate the quad's validity case index: */
 			unsigned int caseIndex=0x0U;
 			if(dfPtr[0]<FrameSource::invalidDepth-1)
@@ -1004,6 +1016,72 @@ void Projector2::processDepthFrame(const FrameBuffer& depthFrame,MeshBuffer& mes
 					++meshBuffer.numTriangles;
 					}
 				}
+			
+			#else
+			
+			/* Sort the quad's vertices by depth value: */
+			FrameSource::DepthPixel depths[4];
+			MeshBuffer::Index indices[4];
+			unsigned int numvs=0;
+			for(int i=0;i<4;++i)
+				{
+				FrameSource::DepthPixel d=dfPtr[offsets[i]];
+				if(d<FrameSource::invalidDepth-1)
+					{
+					/* Sort the pixel into the quad's array: */
+					int insertionPos;
+					for(insertionPos=numvs;insertionPos>0&&depths[insertionPos-1]>d;--insertionPos)
+						{
+						depths[insertionPos]=depths[insertionPos-1];
+						indices[insertionPos]=indices[insertionPos-1];
+						}
+					depths[insertionPos]=d;
+					indices[insertionPos]=index+offsets[i];
+					++numvs;
+					}
+				}
+			
+			/* Generate valid triangles: */
+			if(numvs==4)
+				{
+				if(depths[3]-depths[0]<=tdr)
+					{
+					*(tiPtr++)=index+offsets[0];
+					*(tiPtr++)=index+offsets[1];
+					*(tiPtr++)=index+offsets[2];
+					++meshBuffer.numTriangles;
+					*(tiPtr++)=index+offsets[2];
+					*(tiPtr++)=index+offsets[1];
+					*(tiPtr++)=index+offsets[3];
+					++meshBuffer.numTriangles;
+					}
+				else if(depths[2]-depths[0]<=tdr)
+					{
+					*(tiPtr++)=indices[0];
+					*(tiPtr++)=indices[1];
+					*(tiPtr++)=indices[2];
+					++meshBuffer.numTriangles;
+					}
+				else if(depths[3]-depths[1]<=tdr)
+					{
+					*(tiPtr++)=indices[2];
+					*(tiPtr++)=indices[1];
+					*(tiPtr++)=indices[3];
+					++meshBuffer.numTriangles;
+					}
+				}
+			else if(numvs==3)
+				{
+				if(depths[2]-depths[0]<=tdr)
+					{
+					*(tiPtr++)=indices[0];
+					*(tiPtr++)=indices[1];
+					*(tiPtr++)=indices[2];
+					++meshBuffer.numTriangles;
+					}
+				}
+			
+			#endif
 			}
 		}
 	
