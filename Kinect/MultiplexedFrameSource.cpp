@@ -139,6 +139,28 @@ MultiplexedFrameSource::Stream::~Stream(void)
 		delete owner;
 	}
 
+FrameSource::ColorStreamFormat MultiplexedFrameSource::Stream::getColorStreamFormat(void) const
+	{
+	/* Return the current stream format: */
+	ColorStreamFormat result;
+	result.frameSize=owner->colorFrameReaders[index]->getSize();
+	result.frameRate=Rational(30);
+	result.colorSpace=colorSpace;
+	
+	return result;
+	}
+
+FrameSource::DepthStreamFormat MultiplexedFrameSource::Stream::getDepthStreamFormat(void) const
+	{
+	/* Return the current stream format: */
+	DepthStreamFormat result;
+	result.frameSize=owner->depthFrameReaders[index]->getSize();
+	result.frameRate=Rational(30);
+	result.depthRange=DepthRange(0,invalidDepth-1U);
+	
+	return result;
+	}
+
 FrameSource::DepthCorrection* MultiplexedFrameSource::Stream::getDepthCorrectionParameters(void)
 	{
 	/* Clone and return the depth correction object if it exists, otherwise return NULL: */

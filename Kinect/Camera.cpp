@@ -396,6 +396,20 @@ void Camera::StreamingState::transferCallback(libusb_transfer* transfer)
 		}
 	}
 
+/*******************************
+Static elements of class Camera:
+*******************************/
+
+const Size Camera::actualFrameSizes[2]=
+	{
+	Size(640,480),Size(1280,1024)
+	};
+
+const FrameSource::Rational Camera::actualFrameRates[2]=
+	{
+	FrameSource::Rational(15),FrameSource::Rational(30)
+	};
+
 /***********************
 Methods of class Camera:
 ***********************/
@@ -958,14 +972,18 @@ void Camera::initialize(USB::DeviceList* deviceList)
 	needAltInterface=dd.idProduct==0x02bfU; // Behavior change in Kinect-for-Windows
 	hasNearMode=dd.idProduct==0x02bfU; // New feature in Kinect-for-Windows
 	
-	/* Initialize the camera and streamer states: */
-	frameSizes[0]=FS_640_480;
-	frameSizes[1]=FS_640_480;
-	frameRates[0]=FR_30_HZ;
-	frameRates[1]=FR_30_HZ;
+	/* Select an RGB color space: */
+	colorSpace=RGB;
 	
-	streamers[0]=0;
-	streamers[1]=0;
+	/* Initialize the camera and streamer states: */
+	frameSizes[COLOR]=FS_640_480;
+	frameRates[COLOR]=FR_30_HZ;
+	
+	frameSizes[DEPTH]=FS_640_480;
+	frameRates[DEPTH]=FR_30_HZ;
+	
+	streamers[COLOR]=0;
+	streamers[DEPTH]=0;
 	}
 
 void Camera::resetCameras(void)
@@ -1129,6 +1147,28 @@ Camera::~Camera(void)
 	stopStreaming();
 	}
 
+FrameSource::ColorStreamFormat Camera::getColorStreamFormat(void) const
+	{
+	/* Return the current stream format: */
+	ColorStreamFormat result;
+	result.frameSize=actualFrameSizes[frameSizes[COLOR]];
+	result.frameRate=actualFrameRates[frameRates[COLOR]];
+	result.colorSpace=colorSpace;
+	
+	return result;
+	}
+
+FrameSource::DepthStreamFormat Camera::getDepthStreamFormat(void) const
+	{
+	/* Return the current stream format: */
+	DepthStreamFormat result;
+	result.frameSize=actualFrameSizes[frameSizes[DEPTH]];
+	result.frameRate=actualFrameRates[frameRates[DEPTH]];
+	result.depthRange=DepthRange(300,1100);
+	
+	return result;
+	}
+
 FrameSource::DepthCorrection* Camera::getDepthCorrectionParameters(void)
 	{
 	/* Assemble the name of the depth correction parameters file: */
@@ -1230,7 +1270,6 @@ FrameSource::IntrinsicParameters Camera::getIntrinsicParameters(void)
 
 const Size& Camera::getActualFrameSize(int camera) const
 	{
-	static const Size actualFrameSizes[2]={Size(640,480),Size(1280,1024)};
 	return actualFrameSizes[frameSizes[camera]];
 	}
 
@@ -1451,6 +1490,33 @@ void Camera::stopStreaming(void)
 std::string Camera::getSerialNumber(void)
 	{
 	return serialNumber;
+	}
+
+void Camera::requestColorStreamFormat(const FrameSource::ColorStreamFormat& format)
+	{
+	/* Determine the best-fitting frame size: */
+	double midPixels=Math::sqrt(640.0*480.0*1280.0*1024.0); // Geometric mean of available frame sizes in pixels
+	frameSizes[COLOR]=double(format.frameSize.volume())>=midPixels?FS_1280_1024:FS_640_480;
+	
+	/* Determine the best-fitting frame rate: */
+	if(frameSizes[COLOR]==FS_640_480)
+		frameRates[COLOR]=format.frameRate>=Rational(45,2)?FR_30_HZ:FR_15_HZ;
+	else
+		frameRates[COLOR]=FR_15_HZ; // High-res color mode only supports 15Hz
+	}
+
+void Camera::requestDepthStreamFormat(const FrameSource::DepthStreamFormat& format)
+	{
+	/* Determine the best-fitting frame size: */
+	frameSizes[DEPTH]=FS_640_480; // The depth camera only supports 640x480
+	
+	/* Determine the best-fitting frame rate: */
+	frameRates[DEPTH]=format.frameRate>=Rational(45,2)?FR_30_HZ:FR_15_HZ;
+	}
+
+void Camera::requestZRange(const DirectFrameSource::ZRange& zRange)
+	{
+	/* Just ignore the request... */
 	}
 
 void Camera::configure(Misc::ConfigurationFileSection& configFileSection)

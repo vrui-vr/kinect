@@ -93,7 +93,7 @@ class Projector2:public ProjectorBase,public GLObject
 	
 	/* Private methods: */
 	void* depthFrameProcessingThreadMethod(void); // Thread method for background depth frame processing
-	void buildRenderingShader(GLShaderManager::Namespace& shaderNamespace,unsigned int shaderIndex,GLLightTracker* lightTracker) const; // Builds the rendering shader based on current settings or OpenGL state
+	void buildRenderingShader(GLShaderManager::Namespace& shaderNamespace,unsigned int shaderIndex,GLLightTracker* lightTracker,bool correctGamma) const; // Builds the rendering shader based on current settings or OpenGL state
 	
 	/* Constructors and destructors: */
 	public:

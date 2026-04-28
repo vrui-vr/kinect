@@ -338,6 +338,28 @@ FileFrameSource::~FileFrameSource(void)
 	delete[] backgroundFrame;
 	}
 
+FrameSource::ColorStreamFormat FileFrameSource::getColorStreamFormat(void) const
+	{
+	/* Return the current stream format: */
+	ColorStreamFormat result;
+	result.frameSize=colorFrameReader->getSize();
+	result.frameRate=Rational(30);
+	result.colorSpace=colorSpace;
+	
+	return result;
+	}
+
+FrameSource::DepthStreamFormat FileFrameSource::getDepthStreamFormat(void) const
+	{
+	/* Return the current stream format: */
+	DepthStreamFormat result;
+	result.frameSize=depthFrameReader->getSize();
+	result.frameRate=Rational(30);
+	result.depthRange=DepthRange(0,invalidDepth-1U);
+	
+	return result;
+	}
+
 FrameSource::DepthCorrection* FileFrameSource::getDepthCorrectionParameters(void)
 	{
 	if(depthCorrection!=0)

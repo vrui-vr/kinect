@@ -63,6 +63,8 @@ class MultiplexedFrameSource
 		virtual ~Stream(void); // Destroys the stream
 		
 		/* Methods from class FrameSource: */
+		virtual ColorStreamFormat getColorStreamFormat(void) const;
+		virtual DepthStreamFormat getDepthStreamFormat(void) const;
 		virtual DepthCorrection* getDepthCorrectionParameters(void);
 		virtual IntrinsicParameters getIntrinsicParameters(void);
 		virtual ExtrinsicParameters getExtrinsicParameters(void);

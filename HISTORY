@@ -414,3 +414,7 @@ Kinect-6.0:
   correction requires explicitly saving the color tangent space-to-image
   transformation.
 - Improved handling of invalid triangles in class Kinect::Projector2.
+- Added methods to query streaming formats for the color and depth
+  cameras to Kinect::FrameSource.
+- Added ability to request streaming formats for the color and depth
+  cameras to Kinect::DirectFrameSource.

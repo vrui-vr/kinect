@@ -327,6 +327,10 @@ void DirectFrameSource::configure(Misc::ConfigurationFileSection& configFileSect
 	setRemoveBackground(configFileSection.retrieveValue<bool>("./removeBackground",getRemoveBackground()));
 	}
 
+void DirectFrameSource::fixFormats(void)
+	{
+	}
+
 void DirectFrameSource::buildSettingsDialog(GLMotif::RowColumn* settingsDialog)
 	{
 	const GLMotif::StyleSheet& ss=*settingsDialog->getStyleSheet();

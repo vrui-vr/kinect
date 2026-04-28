@@ -64,15 +64,14 @@ class CameraOrbbec:public DirectFrameSource
 	/* Elements: */
 	OrbbecSDKContextPtr context; // Pointer to the Orbbec SDK context shared by all Orbbec cameras connected to the host
 	DevicePtr device; // The device from which to stream data
-	Size frameSizes[2]; // Requested size for streamed color and depth frames, respectively
-	unsigned int fps; // Requested frame rate for depth and color frames
+	ColorStreamFormat colorStreamFormat; // The requested color stream format
+	DepthStreamFormat depthStreamFormat; // The requested depth stream format
+	ZRange zRange; // The requested absolute z value range
 	SensorPtr colorSensor; // The color sensor
 	VideoStreamProfilePtr colorProfile; // Profile of the color video stream
 	SensorPtr depthSensor; // The depth sensor
 	VideoStreamProfilePtr depthProfile; // Profile of the depth video stream
 	bool sensorsAcquired; // Flag if the selected camera's color and depth sensors have already been acquired
-	DepthPixel dMax; // Maximum valid depth pixel reported at FrameSource interface
-	float zRange[2]; // Range of valid depth values reported at the FrameSource interface in cm
 	float zQuant[2]; // Parameters for the depth quantization formula
 	Video::ImageExtractor* colorFrameExtractor; // Helper object to convert a raw color frame to RGB
 	
@@ -91,6 +90,8 @@ class CameraOrbbec:public DirectFrameSource
 	virtual ~CameraOrbbec(void);
 	
 	/* Methods from class FrameSource: */
+	virtual ColorStreamFormat getColorStreamFormat(void) const;
+	virtual DepthStreamFormat getDepthStreamFormat(void) const;
 	virtual DepthCorrection* getDepthCorrectionParameters(void);
 	virtual IntrinsicParameters getIntrinsicParameters(void);
 	virtual const Size& getActualFrameSize(int sensor) const;
@@ -99,22 +100,12 @@ class CameraOrbbec:public DirectFrameSource
 	
 	/* Methods from class DirectFrameSource: */
 	virtual std::string getSerialNumber(void);
+	virtual void requestColorStreamFormat(const ColorStreamFormat& format);
+	virtual void requestDepthStreamFormat(const DepthStreamFormat& format);
+	virtual void requestZRange(const ZRange& zRange);
 	virtual void configure(Misc::ConfigurationFileSection& configFileSection);
+	virtual void fixFormats(void);
 	virtual void buildSettingsDialog(GLMotif::RowColumn* settingsDialog);
-	
-	/* New methods: */
-	unsigned int getFps(void) const // Returns the requested frame rate
-		{
-		return fps;
-		}
-	const float* getZRange(void) const // Returns the requested depth range in cm as an array of {zMin, zMax}
-		{
-		return zRange;
-		}
-	void setColorFrameSize(const Size& newColorFrameSize); // Sets the color frame size to be requested when streaming starts; throws exception if called when already streaming
-	void setDepthFrameSize(const Size& newDepthFrameSize); // Sets the depth frame size to be requested when streaming starts; throws exception if called when already streaming
-	void setFps(unsigned int newFps); // Sets the frame rate to be requested when streaming starts; throws exception if called when already streaming
-	void setZRange(float zMin,float zMax); // Sets the limits of the reported quantized depth range in cm
 	};
 
 }

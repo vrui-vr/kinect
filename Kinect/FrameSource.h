@@ -27,6 +27,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Misc/SizedTypes.h>
 #include <Misc/Autopointer.h>
 #include <Realtime/Time.h>
+#include <Math/Rational.h>
 #include <Math/Interval.h>
 #if !KINECT_CONFIG_FRAMESOURCE_EXTRINSIC_PROJECTIVE
 #include <Geometry/OrthogonalTransformation.h>
@@ -70,6 +71,7 @@ class FrameSource
 	typedef Misc::UInt16 DepthPixel; // Type for raw depth pixels
 	typedef Math::Interval<DepthPixel> DepthRange; // Type for ranges of depth pixel values
 	typedef Misc::UInt8 ColorComponent; // Type for color pixel components
+	typedef Math::Rational Rational; // Type for rational numbers
 	
 	struct ColorPixel // Type for color pixels in RGB or Y'CbCr color space
 		{
@@ -90,6 +92,28 @@ class FrameSource
 			{
 			return components[index];
 			}
+		};
+	
+	struct StreamFormat // Structure defining the streaming format of a color or depth stream
+		{
+		/* Elements: */
+		public:
+		Size frameSize; // Stream's frame size in pixels
+		Rational frameRate; // Stream's nominal frame rate in Hz
+		};
+	
+	struct ColorStreamFormat:public StreamFormat // Structure defining the streaming format of a color stream
+		{
+		/* Elements: */
+		public:
+		ColorSpace colorSpace; // Stream's color space
+		};
+	
+	struct DepthStreamFormat:public StreamFormat // Structure defining the streaming format of a depth stream
+		{
+		/* Elements: */
+		public:
+		DepthRange depthRange; // Stream's range of raw depth pixel values
 		};
 	
 	class DepthCorrection // Class defining the depth correction parameters of a depth frame source
@@ -171,6 +195,7 @@ class FrameSource
 			/* Convert the pixel index to the pixel center position and call the other method: */
 			return undistortColorPixel(Point2(Scalar(x)+Scalar(0.5),Scalar(y)+Scalar(0.5)));
 			}
+		Scalar depthToZ(unsigned int depth) const; // Returns the (negative) z value in centimeters to which the given nominal depth image value will be transformed
 		};
 	
 	#if KINECT_CONFIG_FRAMESOURCE_EXTRINSIC_PROJECTIVE
@@ -200,10 +225,12 @@ class FrameSource
 		return colorSpace;
 		}
 	virtual void setTimeBase(const Time& newTimeBase); // Sets the frame source's timestamp base point
+	virtual ColorStreamFormat getColorStreamFormat(void) const =0; // Returns the current color stream format
+	virtual DepthStreamFormat getDepthStreamFormat(void) const =0; // Returns the current depth stream format
 	virtual DepthCorrection* getDepthCorrectionParameters(void); // Returns the camera depth correction object, i.e., per-pixel depth value offsets
 	virtual IntrinsicParameters getIntrinsicParameters(void) =0; // Returns the intrinsic camera parameters, i.e., the virtual cameras' lens distortion correction formulas and projection matrices in camera space
 	virtual ExtrinsicParameters getExtrinsicParameters(void) =0; // Returns the extrinsic camera parameters, i.e., the virtual cameras' position and orientation in 3D world space
-	virtual const Size& getActualFrameSize(int sensor) const =0; // Returns the selected frame size of the color or depth stream as an array of (width, height) in pixels
+	virtual const Size& getActualFrameSize(int sensor) const =0; // Returns the selected frame size of the color or depth stream in pixels
 	virtual DepthRange getDepthRange(void) const; // Returns the range of valid depth pixel values delivered by this frame source
 	virtual void setColorStreamingCallback(StreamingCallback& newColorStreamingCallback); // Installs the given color streaming callback; throws an exception if the frame source is currently streaming
 	virtual void setDepthStreamingCallback(StreamingCallback& newDepthStreamingCallback); // Installs the given depth streaming callback; throws an exception if the frame source is currently streaming

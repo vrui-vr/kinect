@@ -907,7 +907,7 @@ KinectViewer::KinectViewer(int numArguments,const char* const arguments[])
 					{
 					/* Open the 3D camera of the given index: */
 					int cameraIndex=atoi(arguments[i]);
-					Kinect::DirectFrameSource* camera=Kinect::openDirectFrameSource(cameraIndex,false);
+					Kinect::DirectFrameSource* camera=Kinect::openDirectFrameSource(cameraIndex);
 					std::cout<<"KinectViewer: Connected to 3D camera with serial number "<<camera->getSerialNumber()<<std::endl;
 					
 					/* Check if it's a first-generation Kinect to apply type-specific settings: */
@@ -1045,7 +1045,7 @@ KinectViewer::KinectViewer(int numArguments,const char* const arguments[])
 				
 				/* Query the camera type: */
 				unsigned int cameraIndex=cfg.retrieveValue<unsigned int>("./cameraIndex",0U);
-				Kinect::DirectFrameSource* source=Kinect::openDirectFrameSource(cameraIndex,true);
+				Kinect::DirectFrameSource* source=Kinect::openDirectFrameSource(cameraIndex);
 				std::cout<<"KinectViewer: Loaded 3D camera with serial number "<<source->getSerialNumber()<<std::endl;
 				
 				/* Try loading the sources's default background image: */

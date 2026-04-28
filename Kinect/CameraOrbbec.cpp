@@ -29,6 +29,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Misc/ConfigurationFile.h>
 #include <Threads/FunctionCalls.h>
 #include <Math/Math.h>
+#include <Math/MathValueCoders.h>
 #include <Video/VideoDataFormat.h>
 #include <Video/FrameBuffer.h>
 #include <Video/ImageExtractor.h>
@@ -72,20 +73,50 @@ void CameraOrbbec::acquireSensors(void)
 	if(colorSensor==0)
 		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Selected device does not have color sensor");
 	
-	/* Find a matching stream profile: */
+	/* Find the stream profile best matching the requested color stream format: */
+	{
+	double requestedSize=double(colorStreamFormat.frameSize.volume());
+	double requestedFrameRate=double(colorStreamFormat.frameRate);
+	double bestSizeRatio=Math::Constants<double>::max;
+	double bestFrameRateRatio=Math::Constants<double>::max;
+	bool bestJpeg=false;
 	const std::shared_ptr<ob::StreamProfileList> cspList=colorSensor->getStreamProfileList();
 	for(unsigned int streamProfileIndex=0;streamProfileIndex<cspList->count();++streamProfileIndex)
 		{
 		try
 			{
-			/* Get the i-th stream profile and check whether it's a video stream profile: */
+			/* Get the i-th stream profile and check whether it's a color video stream profile: */
 			VideoStreamProfilePtr vsp=cspList->getProfile(streamProfileIndex)->as<ob::VideoStreamProfile>();
-			
-			/* Check if the profile matches: */
-			if(vsp->type()==OB_STREAM_COLOR&&vsp->width()==frameSizes[0][0]&&vsp->height()==frameSizes[0][1]&&vsp->fps()==fps&&vsp->format()==OB_FORMAT_MJPG)
+			if(vsp->type()==OB_STREAM_COLOR)
 				{
-				colorProfile=vsp;
-				break;
+				/* Calculate the ratios between the stream profile's frame size and frame rate and the requested frame size and frame rate, respectively: */
+				double size=double(vsp->width())*double(vsp->height());
+				double sizeRatio=size>=requestedSize?size/requestedSize:requestedSize/size;
+				double frameRateRatio=double(vsp->fps())>=requestedFrameRate?double(vsp->fps())/requestedFrameRate:requestedFrameRate/double(vsp->fps());
+				if(sizeRatio<bestSizeRatio)
+					{
+					/* Take the stream profile: */
+					colorProfile=vsp;
+					bestSizeRatio=sizeRatio;
+					bestFrameRateRatio=frameRateRatio;
+					bestJpeg=vsp->format()==OB_FORMAT_MJPG;
+					}
+				else if(sizeRatio==bestSizeRatio)
+					{
+					if(frameRateRatio<bestFrameRateRatio)
+						{
+						/* Take the stream profile: */
+						colorProfile=vsp;
+						bestFrameRateRatio=frameRateRatio;
+						bestJpeg=vsp->format()==OB_FORMAT_MJPG;
+						}
+					else if(frameRateRatio==bestFrameRateRatio&&!bestJpeg&&vsp->format()==OB_FORMAT_MJPG)
+						{
+						/* Take the stream profile: */
+						colorProfile=vsp;
+						bestJpeg=true;
+						}
+					}
 				}
 			}
 		catch(const std::runtime_error&)
@@ -93,8 +124,16 @@ void CameraOrbbec::acquireSensors(void)
 			/* Ignore the error and carry on... */
 			}
 		}
+	}
 	if(colorProfile==0)
-		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"No color stream profile matching %ux%u@%uHz found",frameSizes[0][0],frameSizes[0][1],fps);
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"No color stream profile matching %ux%u@%fHz found",colorStreamFormat.frameSize[0],colorStreamFormat.frameSize[1],double(colorStreamFormat.frameRate));
+	
+	/* Update the requested color stream format: */
+	colorStreamFormat.frameSize=Size(colorProfile->width(),colorProfile->height());
+	colorStreamFormat.frameRate=Rational(colorProfile->fps(),1);
+	
+	/* Set the requested color space: */
+	colorSpace=colorStreamFormat.colorSpace;
 	
 	/* Find the device's depth sensor: */
 	for(unsigned int sensorIndex=0;sensorIndex<sensorList->count();++sensorIndex)
@@ -110,7 +149,12 @@ void CameraOrbbec::acquireSensors(void)
 	if(depthSensor==0)
 		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Selected device does not have depth sensor");
 	
-	/* Find a matching stream profile: */
+	/* Find the stream profile best matching the requested depth stream format: */
+	{
+	double requestedSize=double(depthStreamFormat.frameSize.volume());
+	double requestedFrameRate=double(depthStreamFormat.frameRate);
+	double bestSizeRatio=Math::Constants<double>::max;
+	double bestFrameRateRatio=Math::Constants<double>::max;
 	const std::shared_ptr<ob::StreamProfileList> dspList=depthSensor->getStreamProfileList();
 	for(unsigned int streamProfileIndex=0;streamProfileIndex<dspList->count();++streamProfileIndex)
 		{
@@ -118,12 +162,25 @@ void CameraOrbbec::acquireSensors(void)
 			{
 			/* Get the i-th stream profile and check whether it's a video stream profile: */
 			VideoStreamProfilePtr vsp=dspList->getProfile(streamProfileIndex)->as<ob::VideoStreamProfile>();
-			
-			/* Check if the profile matches: */
-			if(vsp->type()==OB_STREAM_DEPTH&&vsp->width()==frameSizes[1][0]&&vsp->height()==frameSizes[1][1]&&vsp->fps()==fps)
+			if(vsp->type()==OB_STREAM_DEPTH)
 				{
-				depthProfile=vsp;
-				break;
+				/* Calculate the ratios between the stream profile's frame size and frame rate and the requested frame size and frame rate, respectively: */
+				double size=double(vsp->width())*double(vsp->height());
+				double sizeRatio=size>=requestedSize?size/requestedSize:requestedSize/size;
+				double frameRateRatio=double(vsp->fps())>=requestedFrameRate?double(vsp->fps())/requestedFrameRate:requestedFrameRate/double(vsp->fps());
+				if(sizeRatio<bestSizeRatio)
+					{
+					/* Take the stream profile: */
+					depthProfile=vsp;
+					bestSizeRatio=sizeRatio;
+					bestFrameRateRatio=frameRateRatio;
+					}
+				else if(sizeRatio==bestSizeRatio&&frameRateRatio<bestFrameRateRatio)
+					{
+					/* Take the stream profile: */
+					depthProfile=vsp;
+					bestFrameRateRatio=frameRateRatio;
+					}
 				}
 			}
 		catch(const std::runtime_error&)
@@ -131,8 +188,18 @@ void CameraOrbbec::acquireSensors(void)
 			/* Ignore the error and carry on... */
 			}
 		}
+	}
 	if(depthProfile==0)
-		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"No depth stream profile matching %ux%u@%uHz found",frameSizes[1][0],frameSizes[1][1],fps);
+		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"No depth stream profile matching %ux%u@%fHz found",depthStreamFormat.frameSize[0],depthStreamFormat.frameSize[1],double(depthStreamFormat.frameRate));
+	
+	/* Update the requested depth stream format: */
+	depthStreamFormat.frameSize=Size(depthProfile->width(),depthProfile->height());
+	depthStreamFormat.frameRate=Rational(depthProfile->fps(),1);
+	
+	/* Update the raw depth value quantization coefficients: */
+	float dMax=float(depthStreamFormat.depthRange.getMax());
+	zQuant[0]=dMax*zRange.getMax()*zRange.getMin()/zRange.getSize();
+	zQuant[1]=dMax+dMax*zRange.getMin()/zRange.getSize();
 	
 	/* Mark the sensors as acquired: */
 	sensorsAcquired=true;
@@ -168,12 +235,15 @@ void CameraOrbbec::colorFrameCallback(std::shared_ptr<ob::Frame> frame)
 	*********************************************************************/
 	
 	/* Allocate a frame buffer and extract an RGB image from the color frame: */
-	FrameBuffer colorFrame(frameSizes[0],frameSizes[0].volume()*sizeof(FrameSource::ColorPixel));
+	FrameBuffer colorFrame(colorStreamFormat.frameSize,colorStreamFormat.frameSize.volume()*sizeof(FrameSource::ColorPixel));
 	colorFrame.timeStamp=double(now-timeBase);
 	Video::FrameBuffer frameBuffer;
 	frameBuffer.start=static_cast<unsigned char*>(frame->data());
 	frameBuffer.used=frameBuffer.size=frame->dataSize();
-	colorFrameExtractor->extractRGB(&frameBuffer,colorFrame.getData<FrameSource::ColorPixel>());
+	if(colorSpace==YPCBCR)
+		colorFrameExtractor->extractYpCbCr(&frameBuffer,colorFrame.getData<FrameSource::ColorPixel>());
+	else
+		colorFrameExtractor->extractRGB(&frameBuffer,colorFrame.getData<FrameSource::ColorPixel>());
 	
 	/* Call the color streaming callback with the extracted frame: */
 	(*colorStreamingCallback)(colorFrame);
@@ -192,22 +262,22 @@ void CameraOrbbec::depthFrameCallback(std::shared_ptr<ob::Frame> frame)
 	/* Calculate depth quantization coefficients based on the selected Z value range in cm and the frame's raw depth value scale: */
 	DepthFramePtr dFrame=frame->as<ob::DepthFrame>();
 	float depthScale=dFrame->getValueScale(); // Scale factor from raw integer depth values to Z values in mm
-	float b=float(dMax)*zRange[1]/(zRange[1]-zRange[0]);
-	float a=b*zRange[0]*10.0f/depthScale;
+	float b=float(depthStreamFormat.depthRange.getMax())*zRange.getMax()/(zRange.getMax()-zRange.getMin());
+	float a=b*zRange.getMin()*10.0f/depthScale;
 	
 	/* Calculate the valid range of raw depth values: */
-	ObDepthPixel min(Math::ceil(zRange[0]*10.0f/depthScale));
-	ObDepthPixel max(Math::floor(zRange[1]*10.0f/depthScale));
+	ObDepthPixel min(Math::ceil(zRange.getMin()*10.0f/depthScale));
+	ObDepthPixel max(Math::floor(zRange.getMax()*10.0f/depthScale));
 	
 	/* Allocate a frame buffer and quantize and flip the depth frame: */
-	FrameBuffer depthFrame(frameSizes[1],frameSizes[1].volume()*sizeof(FrameSource::DepthPixel));
+	FrameBuffer depthFrame(depthStreamFormat.frameSize,depthStreamFormat.frameSize.volume()*sizeof(FrameSource::DepthPixel));
 	depthFrame.timeStamp=double(now-timeBase);
-	const ObDepthPixel* sRowPtr=static_cast<const ObDepthPixel*>(dFrame->data())+(frameSizes[1][1]-1)*frameSizes[1][0];
+	const ObDepthPixel* sRowPtr=static_cast<const ObDepthPixel*>(dFrame->data())+(depthStreamFormat.frameSize[1]-1)*depthStreamFormat.frameSize[0];
 	FrameSource::DepthPixel* dPtr=depthFrame.getData<FrameSource::DepthPixel>();
-	for(unsigned int y=0;y<frameSizes[1][1];++y,sRowPtr-=frameSizes[1][0])
+	for(unsigned int y=0;y<depthStreamFormat.frameSize[1];++y,sRowPtr-=depthStreamFormat.frameSize[0])
 		{
 		const ObDepthPixel* sPtr=sRowPtr;
-		for(unsigned int x=0;x<frameSizes[1][0];++x,++sPtr,++dPtr)
+		for(unsigned int x=0;x<depthStreamFormat.frameSize[0];++x,++sPtr,++dPtr)
 			*dPtr=*sPtr>=min&&*sPtr<=max?FrameSource::DepthPixel(b-a/float(*sPtr)+0.5f):FrameSource::invalidDepth;
 		}
 	
@@ -221,16 +291,15 @@ void CameraOrbbec::depthFrameCallback(std::shared_ptr<ob::Frame> frame)
 void CameraOrbbec::initialize(void)
 	{
 	/* Set the default color and depth streaming formats: */
-	// frameSizes[0]=Size(3840,2160);
-	frameSizes[0]=Size(1920,1080);
-	frameSizes[1]=Size(640,576);
-	fps=30;
+	colorStreamFormat.frameSize=Size(1920,1080);
+	colorStreamFormat.frameRate=Rational(30);
+	colorStreamFormat.colorSpace=YPCBCR;
 	
-	/* Set the maximum valid depth pixel value: */
-	dMax=FrameSource::invalidDepth-1;
+	depthStreamFormat.frameSize=Size(640,576);
+	depthStreamFormat.frameRate=Rational(30);
+	depthStreamFormat.depthRange=DepthRange(0,FrameSource::invalidDepth-1);
 	
-	/* Set a default Z range: */
-	setZRange(50.0f,386.0f); // Values from Orbbec Femto Bolt datasheet
+	zRange=ZRange(50.0f,386.0f); // Values from Orbbec Femto Bolt datasheet
 	}
 
 size_t CameraOrbbec::getNumDevices(void)
@@ -292,6 +361,18 @@ CameraOrbbec::~CameraOrbbec(void)
 	device=0;
 	}
 
+FrameSource::ColorStreamFormat CameraOrbbec::getColorStreamFormat(void) const
+	{
+	/* Return the current stream format: */
+	return colorStreamFormat;
+	}
+
+FrameSource::DepthStreamFormat CameraOrbbec::getDepthStreamFormat(void) const
+	{
+	/* Return the current stream format: */
+	return depthStreamFormat;
+	}
+
 FrameSource::DepthCorrection* CameraOrbbec::getDepthCorrectionParameters(void)
 	{
 	/* Don't have 'em, don't need 'em: */
@@ -317,7 +398,7 @@ FrameSource::IntrinsicParameters CameraOrbbec::getIntrinsicParameters(void)
 	di2tMat(0,2)=-(depthIntrinsics.cx+0.5)/depthIntrinsics.fx; // Add 0.5 because Orbbec SDK assumes pixels at integer positions
 	di2tMat(1,0)=0.0;
 	di2tMat(1,1)=1.0/depthIntrinsics.fy;
-	di2tMat(1,2)=-(double(frameSizes[1][1])-(depthIntrinsics.cy+0.5))/depthIntrinsics.fy; // Invert because we flip the depth frame, and add 0.5 because see above
+	di2tMat(1,2)=-(double(depthStreamFormat.frameSize[1])-(depthIntrinsics.cy+0.5))/depthIntrinsics.fy; // Invert because we flip the depth frame, and add 0.5 because see above
 	
 	/* Calculate the inverse: */
 	result.dt2i=Geometry::invert(result.di2t);
@@ -330,8 +411,8 @@ FrameSource::IntrinsicParameters CameraOrbbec::getIntrinsicParameters(void)
 	dMat(1,1)=di2tMat(1,1);
 	dMat(1,3)=di2tMat(1,2);
 	dMat(2,3)=-1.0;
-	double b=double(dMax)*double(zRange[1])/(double(zRange[1])-double(zRange[0]));
-	double a=b*double(zRange[0]);
+	double b=double(depthStreamFormat.depthRange.getMax())*double(zRange.getMax())/(double(zRange.getMax())-double(zRange.getMin()));
+	double a=b*double(zRange.getMin());
 	dMat(3,2)=-1.0/a;
 	dMat(3,3)=b/a;
 	
@@ -341,12 +422,12 @@ FrameSource::IntrinsicParameters CameraOrbbec::getIntrinsicParameters(void)
 	/* Create the transformation from tangent space to color image space: */
 	OBCameraIntrinsic colorIntrinsics=colorProfile->getIntrinsic();
 	IntrinsicParameters::ATransform::Matrix& ct2iMat=result.ct2i.getMatrix();
-	ct2iMat(0,0)=-colorIntrinsics.fx/double(frameSizes[0][0]);
+	ct2iMat(0,0)=-colorIntrinsics.fx/double(colorStreamFormat.frameSize[0]);
 	ct2iMat(0,1)=0.0;
-	ct2iMat(0,2)=1.0-(colorIntrinsics.cx+0.5)/double(frameSizes[0][0]); // Add 0.5 because Orbbec SDK assumes pixels at integer positions
+	ct2iMat(0,2)=1.0-(colorIntrinsics.cx+0.5)/double(colorStreamFormat.frameSize[0]); // Add 0.5 because Orbbec SDK assumes pixels at integer positions
 	ct2iMat(1,0)=0.0;
-	ct2iMat(1,1)=-colorIntrinsics.fy/double(frameSizes[0][1]);
-	ct2iMat(1,2)=1.0-(colorIntrinsics.cy+0.5)/double(frameSizes[0][1]); // Invert because we flip the color frame, and add 0.5 because see above
+	ct2iMat(1,1)=-colorIntrinsics.fy/double(colorStreamFormat.frameSize[1]);
+	ct2iMat(1,2)=1.0-(colorIntrinsics.cy+0.5)/double(colorStreamFormat.frameSize[1]); // Invert because we flip the color frame, and add 0.5 because see above
 	
 	/* Calculate the inverse: */
 	result.ci2t=Geometry::invert(result.ct2i);
@@ -386,7 +467,17 @@ FrameSource::IntrinsicParameters CameraOrbbec::getIntrinsicParameters(void)
 const Size& CameraOrbbec::getActualFrameSize(int sensor) const
 	{
 	/* Return the requested frame size for the given sensor: */
-	return frameSizes[sensor];
+	switch(sensor)
+		{
+		case COLOR:
+			return colorStreamFormat.frameSize;
+		
+		case DEPTH:
+			return depthStreamFormat.frameSize;
+		
+		default:
+			throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Invalid sensor");
+		}
 	}
 
 void CameraOrbbec::startStreaming(void)
@@ -405,8 +496,8 @@ void CameraOrbbec::startStreaming(void)
 		/* Create a video data format descriptor for the color sensor's selected profile: */
 		Video::VideoDataFormat videoDataFormat;
 		videoDataFormat.setPixelFormat(obPixelFormats[colorProfile->format()-OB_FORMAT_YUYV]);
-		videoDataFormat.size=frameSizes[0];
-		videoDataFormat.frameInterval=Math::Rational(1,fps);
+		videoDataFormat.size=colorStreamFormat.frameSize;
+		videoDataFormat.frameInterval=colorStreamFormat.frameRate.inverse();
 		
 		/* Create a color frame extractor: */
 		colorFrameExtractor=Video::ImageExtractor::createExtractor(videoDataFormat);
@@ -451,6 +542,36 @@ std::string CameraOrbbec::getSerialNumber(void)
 	return result;
 	}
 
+void CameraOrbbec::requestColorStreamFormat(const FrameSource::ColorStreamFormat& format)
+	{
+	/* Ignore the request if the sensors have already been acquired: */
+	if(sensorsAcquired)
+		return;
+	
+	/* Store the requested format: */
+	colorStreamFormat=format;
+	}
+
+void CameraOrbbec::requestDepthStreamFormat(const FrameSource::DepthStreamFormat& format)
+	{
+	/* Ignore the request if the sensors have already been acquired: */
+	if(sensorsAcquired)
+		return;
+	
+	/* Store the requested format: */
+	depthStreamFormat=format;
+	}
+
+void CameraOrbbec::requestZRange(const DirectFrameSource::ZRange& newZRange)
+	{
+	/* Ignore the request if the sensors have already been acquired: */
+	if(sensorsAcquired)
+		return;
+	
+	/* Store the requested Z range: */
+	zRange=newZRange;
+	}
+
 void CameraOrbbec::configure(Misc::ConfigurationFileSection& configFileSection)
 	{
 	/* Throw an exception if the sensors have already been acquired, because that means the caller already queried something that depends on the depth and/or color frame sizes: */
@@ -461,16 +582,24 @@ void CameraOrbbec::configure(Misc::ConfigurationFileSection& configFileSection)
 	DirectFrameSource::configure(configFileSection);
 	
 	/* Configure the streaming frame sizes and frame rate: */
-	configFileSection.updateValue("./colorFrameSize",frameSizes[0]);
-	configFileSection.updateValue("./depthFrameSize",frameSizes[1]);
-	configFileSection.updateValue("./frameRate",fps);
+	configFileSection.updateValue("./colorFrameSize",colorStreamFormat.frameSize);
+	configFileSection.updateValue("./colorFrameRate",colorStreamFormat.frameRate);
+	configFileSection.updateValue("./depthFrameSize",depthStreamFormat.frameSize);
+	configFileSection.updateValue("./depthFrameRate",depthStreamFormat.frameRate);
 	
 	/* Configure the Z value range for custom quantization: */
 	if(configFileSection.hasTag("./depthValueRange"))
 		{
 		Misc::FixedArray<float,2> depthValueRange=configFileSection.retrieveValue<Misc::FixedArray<float,2> >("./depthValueRange");
-		setZRange(depthValueRange[0],depthValueRange[1]);
+		zRange=ZRange(depthValueRange[0],depthValueRange[1]);
 		}
+	}
+
+void CameraOrbbec::fixFormats(void)
+	{
+	/* Acquire the color and depth sensors if that hasn't happened yet: */
+	if(!sensorsAcquired)
+		acquireSensors();
 	}
 
 void CameraOrbbec::buildSettingsDialog(GLMotif::RowColumn* settingsDialog)
@@ -479,51 +608,6 @@ void CameraOrbbec::buildSettingsDialog(GLMotif::RowColumn* settingsDialog)
 	DirectFrameSource::buildSettingsDialog(settingsDialog);
 	
 	// const GLMotif::StyleSheet& ss=*settingsDialog->getStyleSheet();
-	}
-
-void CameraOrbbec::setColorFrameSize(const Size& newColorFrameSize)
-	{
-	/* Throw an exception if the sensors have already been acquired, because that means the caller already queried something that depends on the color frame size: */
-	if(sensorsAcquired)
-		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Sensors already acquired");
-	
-	/* Update the requested color frame size: */
-	frameSizes[0]=newColorFrameSize;
-	}
-
-void CameraOrbbec::setDepthFrameSize(const Size& newDepthFrameSize)
-	{
-	/* Throw an exception if the sensors have already been acquired, because that means the caller already queried something that depends on the depth frame size: */
-	if(sensorsAcquired)
-		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Sensors already acquired");
-	
-	/* Update the requested depth frame size: */
-	frameSizes[1]=newDepthFrameSize;
-	}
-
-void CameraOrbbec::setFps(unsigned int newFps)
-	{
-	/* Throw an exception if already streaming: */
-	if(streaming)
-		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Already streaming");
-	
-	/* Update the requested streaming frame rate for both the depth and color sensors: */
-	fps=newFps;
-	}
-
-void CameraOrbbec::setZRange(float zMin,float zMax)
-	{
-	/* Check the z value range: */
-	if(zMin>=zMax)
-		throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Invalid Z value range [%f, %f]",zMin,zMax);
-	
-	/* Update the z value range: */
-	zRange[0]=zMin;
-	zRange[1]=zMax;
-	
-	/* Update the raw depth value quantization coefficients: */
-	zQuant[0]=float(dMax)*zRange[1]*zRange[0]/(zRange[1]-zRange[0]);
-	zQuant[1]=float(dMax)+float(dMax)*zRange[0]/(zRange[1]-zRange[0]);
 	}
 
 }

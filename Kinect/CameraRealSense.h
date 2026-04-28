@@ -78,6 +78,8 @@ class CameraRealSense:public DirectFrameSource
 	virtual ~CameraRealSense(void); // Destroys the camera
 	
 	/* Methods from class FrameSource: */
+	virtual ColorStreamFormat getColorStreamFormat(void) const;
+	virtual DepthStreamFormat getDepthStreamFormat(void) const;
 	virtual DepthCorrection* getDepthCorrectionParameters(void);
 	virtual IntrinsicParameters getIntrinsicParameters(void);
 	virtual const Size& getActualFrameSize(int sensor) const;
@@ -86,21 +88,11 @@ class CameraRealSense:public DirectFrameSource
 	
 	/* Methods from class DirectFrameSource: */
 	virtual std::string getSerialNumber(void);
+	virtual void requestColorStreamFormat(const ColorStreamFormat& format);
+	virtual void requestDepthStreamFormat(const DepthStreamFormat& format);
+	virtual void requestZRange(const ZRange& zRange);
 	virtual void configure(Misc::ConfigurationFileSection& configFileSection);
 	virtual void buildSettingsDialog(GLMotif::RowColumn* settingsDialog);
-	
-	/* New methods: */
-	void setFrameSize(int camera,const Size& newFrameSize); // Sets the frame size of the color or depth camera for the next streaming operation
-	const Size& getFrameSize(int camera) const // Returns the frame size of the color or depth camera
-		{
-		return frameSizes[camera];
-		}
-	void setFrameRate(int camera,int frameRate); // Sets the frame rate in Hz of the color or depth camera for the next streaming operation
-	int getFrameRate(int camera) const // Returns the frame rate in Hz of the color or depth camera
-		{
-		return frameRates[camera];
-		}
-	void setZRange(RSDepthPixel zMin,RSDepthPixel zMax); // Sets the range of valid z values in mm for depth quantization
 	};
 
 }

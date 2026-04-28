@@ -85,6 +85,18 @@ CameraOrbbec::~CameraOrbbec(void)
 	{
 	}
 
+FrameSource::ColorStreamFormat CameraOrbbec::getColorStreamFormat(void) const
+	{
+	/* Never called: */
+	return ColorStreamFormat();
+	}
+
+FrameSource::DepthStreamFormat CameraOrbbec::getDepthStreamFormat(void) const
+	{
+	/* Never called: */
+	return DepthStreamFormat();
+	}
+
 FrameSource::DepthCorrection* CameraOrbbec::getDepthCorrectionParameters(void)
 	{
 	/* Never called */
@@ -100,7 +112,7 @@ FrameSource::IntrinsicParameters CameraOrbbec::getIntrinsicParameters(void)
 const Size& CameraOrbbec::getActualFrameSize(int sensor) const
 	{
 	/* Never called */
-	return frameSizes[sensor];
+	return colorStreamFormat.frameSize;
 	}
 
 void CameraOrbbec::startStreaming(void)
@@ -119,32 +131,27 @@ std::string CameraOrbbec::getSerialNumber(void)
 	return std::string();
 	}
 
+void CameraOrbbec::requestColorStreamFormat(const FrameSource::ColorStreamFormat& format)
+	{
+	/* Never called */
+	}
+
+void CameraOrbbec::requestDepthStreamFormat(const FrameSource::DepthStreamFormat& format)
+	{
+	/* Never called */
+	}
+
+void CameraOrbbec::requestZRange(const DirectFrameSource::ZRange& zRange)
+	{
+	/* Never called */
+	}
+
 void CameraOrbbec::configure(Misc::ConfigurationFileSection& configFileSection)
 	{
 	/* Never called */
 	}
 
 void CameraOrbbec::buildSettingsDialog(GLMotif::RowColumn* settingsDialog)
-	{
-	/* Never called */
-	}
-
-void CameraOrbbec::setColorFrameSize(const Size& newColorFrameSize)
-	{
-	/* Never called */
-	}
-
-void CameraOrbbec::setDepthFrameSize(const Size& newDepthFrameSize)
-	{
-	/* Never called */
-	}
-
-void CameraOrbbec::setFps(unsigned int newFps)
-	{
-	/* Never called */
-	}
-
-void CameraOrbbec::setZRange(float zMin,float zMax)
 	{
 	/* Never called */
 	}

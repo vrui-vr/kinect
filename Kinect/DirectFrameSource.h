@@ -30,6 +30,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <Misc/CallbackData.h>
 #include <Misc/CallbackList.h>
 #include <Threads/Mutex.h>
+#include <Math/Interval.h>
 #include <GLMotif/Button.h>
 #include <GLMotif/ToggleButton.h>
 #include <GLMotif/TextFieldSlider.h>
@@ -58,6 +59,7 @@ class DirectFrameSource:public FrameSource
 	{
 	/* Embedded classes: */
 	public:
+	typedef Math::Interval<float> ZRange; // Type for ranges of absolute z values in centimeters
 	typedef Threads::FunctionCall<DirectFrameSource&> BackgroundCaptureCallback; // Function call type for completion of background capture callback
 	typedef Misc::Autopointer<BackgroundCaptureCallback> BackgroundCaptureCallbackPtr; // Type for smart pointers to background capture callbacks
 	
@@ -122,7 +124,11 @@ class DirectFrameSource:public FrameSource
 	
 	/* New methods: */
 	virtual std::string getSerialNumber(void) =0; // Returns the camera's serial number, unique among all camera device types
+	virtual void requestColorStreamFormat(const ColorStreamFormat& format) =0; // Requests a color stream format
+	virtual void requestDepthStreamFormat(const DepthStreamFormat& format) =0; // Requests a depth stream format
+	virtual void requestZRange(const ZRange& zRange) =0; // Requests a range of absolute z values in centimeters
 	virtual void configure(Misc::ConfigurationFileSection& configFileSection); // Configures the camera device by reading from the given configuration file section
+	virtual void fixFormats(void); // Fixes the requested color and depth stream formats and projection parameters
 	virtual void buildSettingsDialog(GLMotif::RowColumn* settingsDialog); // Creates a GUI to set runtime-adjustable settings inside the given settings dialog
 	Misc::CallbackList& getIntrinsicParametersChangedCallbacks(void) // Returns the list of intrinsic parameter change callbacks
 		{

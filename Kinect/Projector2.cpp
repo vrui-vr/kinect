@@ -34,6 +34,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <GL/GLMiscTemplates.h>
 #include <GL/GLVertexArrayParts.h>
 #include <GL/GLVertex.h>
+#include <GL/GLContext.h>
 #include <GL/GLContextData.h>
 #include <GL/Extensions/GLARBVertexBufferObject.h>
 #include <GL/Extensions/GLARBMultitexture.h>
@@ -192,7 +193,7 @@ void* Projector2::depthFrameProcessingThreadMethod(void)
 	return 0;
 	}
 
-void Projector2::buildRenderingShader(GLShaderManager::Namespace& shaderNamespace,unsigned int shaderIndex,GLLightTracker* lightTracker) const
+void Projector2::buildRenderingShader(GLShaderManager::Namespace& shaderNamespace,unsigned int shaderIndex,GLLightTracker* lightTracker,bool correctGamma) const
 	{
 	#if DEBUGGING
 	std::cout<<"Rebuilding facade rendering shader "<<shaderIndex<<std::endl;
@@ -203,81 +204,81 @@ void Projector2::buildRenderingShader(GLShaderManager::Namespace& shaderNamespac
 	
 	/* Start vertex shader's declarations: */
 	std::string vertexShaderDeclarations="\
-		#extension GL_ARB_texture_rectangle : enable\n\
-		#extension GL_EXT_gpu_shader4 : enable\n\
-		\n\
-		uniform usampler2DRect depthSampler; // Sampler for depth image texture\n";
+	#extension GL_ARB_texture_rectangle : enable\n\
+	#extension GL_EXT_gpu_shader4 : enable\n\
+	\n\
+	uniform usampler2DRect depthSampler; // Sampler for depth image texture\n";
 	
 	/* Start vertex shader's main function: */
 	std::string vertexShaderMain="\
-		void main()\n\
-			{\n\
-			/* Get the pixel's depth value: */\n\
-			float depth=float(texture2DRect(depthSampler,gl_MultiTexCoord0.xy).r);\n";
+	void main()\n\
+		{\n\
+		/* Get the pixel's depth value: */\n\
+		float depth=float(texture2DRect(depthSampler,gl_MultiTexCoord0.xy).r);\n";
 	
 	/* Check if per-pixel depth correction is required: */
 	if(depthCorrection!=0)
 		{
 		/* Add to vertex shader's declarations: */
 		vertexShaderDeclarations+="\
-			uniform sampler2DRect depthCorrectionSampler; // Sampler for per-pixel depth correction texture\n";
+	uniform sampler2DRect depthCorrectionSampler; // Sampler for per-pixel depth correction texture\n";
 		
 		/* Add to vertex shader's main function: */
 		vertexShaderMain+="\
-				\n\
-				/* Get the pixel's depth correction coefficients: */\n\
-				vec2 depthCorrection=texture2DRect(depthCorrectionSampler,gl_MultiTexCoord0.xy).rg;\n\
-				\n\
-				/* Correct the pixel's depth: */\n\
-				depth=depth*depthCorrection.x+depthCorrection.y;\n";
+		\n\
+		/* Get the pixel's depth correction coefficients: */\n\
+		vec2 depthCorrection=texture2DRect(depthCorrectionSampler,gl_MultiTexCoord0.xy).rg;\n\
+		\n\
+		/* Correct the pixel's depth: */\n\
+		depth=depth*depthCorrection.x+depthCorrection.y;\n";
 		}
 	
 	/* Continue vertex shader's main function: */
 	vertexShaderMain+="\
-			\n\
-			/* Create the pixel's position in depth image space: */\n\
-			vec4 diPixel=vec4(gl_Vertex.xy,depth,1.0);\n";
+		\n\
+		/* Create the pixel's position in depth image space: */\n\
+		vec4 diPixel=vec4(gl_Vertex.xy,depth,1.0);\n";
 	
 	/* Check if color texture mapping was requested: */
 	if(mapTexture)
 		{
 		/* Add to vertex shader's declarations: */
 		vertexShaderDeclarations+="\
-			uniform mat4 colorProjection; // Projection from depth image space to color image space (or color tangent space in case of color lens distortion)\n";
+	uniform mat4 colorProjection; // Projection from depth image space to color image space (or color tangent space in case of color lens distortion)\n";
 		
 		if(colorLensDistortion)
 			{
 			/* Add to vertex shader's declarations: */
 			vertexShaderDeclarations+="\
-				uniform float distortion[8]; // Color distortion correction formula coefficients\n\
-				uniform mat4 colorTangentToImage; // Projection from color tangent space to color image space\n";
+	uniform float distortion[8]; // Color distortion correction formula coefficients\n\
+	uniform mat4 colorTangentToImage; // Projection from color tangent space to color image space\n";
 			
 			/* Add to vertex shader's main function: */
 			vertexShaderMain+="\
-					\n\
-					/* Project the pixel from depth image space to affine color tangent space: */\n\
-					vec4 ct=colorProjection*diPixel;\n\
-					vec2 cta=ct.xy/ct.w;\n\
-					\n\
-					/* Evaluate the lens distortion correction formula: */\n\
-					float r2=dot(cta,cta);\n\
-					float radial=(1.0+r2*(distortion[0]+r2*(distortion[1]+r2*distortion[2])))/\n\
-					             (1.0+r2*(distortion[3]+r2*(distortion[4]+r2*distortion[5])));\n\
-					vec4 ccta=vec4(cta.x*radial+2.0*distortion[6]*cta.x*cta.y+distortion[7]*(r2+2.0*cta.x*cta.x),\n\
-					               cta.y*radial+distortion[6]*(r2+2.0*cta.y*cta.y)+2.0*distortion[7]*cta.x*cta.y,\n\
-					               0.0,\n\
-					               1.0);\n\
-					\n\
-					/* Transform the distortion-corrected color tangent space point to color image space: */\n\
-					gl_TexCoord[0]=colorTangentToImage*ccta;\n";
+		\n\
+		/* Project the pixel from depth image space to affine color tangent space: */\n\
+		vec4 ct=colorProjection*diPixel;\n\
+		vec2 cta=ct.xy/ct.w;\n\
+		\n\
+		/* Evaluate the lens distortion correction formula: */\n\
+		float r2=dot(cta,cta);\n\
+		float radial=(1.0+r2*(distortion[0]+r2*(distortion[1]+r2*distortion[2])))/\n\
+		             (1.0+r2*(distortion[3]+r2*(distortion[4]+r2*distortion[5])));\n\
+		vec4 ccta=vec4(cta.x*radial+2.0*distortion[6]*cta.x*cta.y+distortion[7]*(r2+2.0*cta.x*cta.x),\n\
+		               cta.y*radial+distortion[6]*(r2+2.0*cta.y*cta.y)+2.0*distortion[7]*cta.x*cta.y,\n\
+		               0.0,\n\
+		               1.0);\n\
+		\n\
+		/* Transform the distortion-corrected color tangent space point to color image space: */\n\
+		gl_TexCoord[0]=colorTangentToImage*ccta;\n";
 			}
 		else
 			{
 			/* Add to vertex shader's main function: */
 			vertexShaderMain+="\
-					\n\
-					/* Project the pixel from depth image space to color image space: */\n\
-					gl_TexCoord[0]=colorProjection*diPixel;\n";
+		\n\
+		/* Project the pixel from depth image space to color image space: */\n\
+		gl_TexCoord[0]=colorProjection*diPixel;\n";
 			}
 		}
 	
@@ -287,32 +288,32 @@ void Projector2::buildRenderingShader(GLShaderManager::Namespace& shaderNamespac
 		{
 		/* Add to vertex shader's declarations: */
 		vertexShaderDeclarations+="\
-			uniform mat4 depthProjection; // Projection from depth image space to eye space\n\
-			uniform mat4 inverseTransposedDepthProjection; // Inverse transposed projection from depth image space into eye space for illumination\n\
-			varying vec4 frontColor;\n";
+	uniform mat4 depthProjection; // Projection from depth image space to eye space\n\
+	uniform mat4 inverseTransposedDepthProjection; // Inverse transposed projection from depth image space into eye space for illumination\n\
+	varying vec4 frontColor;\n";
 		
 		/* Add to vertex shader's main function: */
 		vertexShaderMain+="\
-				\n\
-				/* Calculate the pixel's normal vector in depth image space, ignoring per-pixel depth correction: */\n\
-				vec3 diNormal=vec3(float(texture2DRect(depthSampler,gl_MultiTexCoord0.xy+vec2(1.0,0.0)).r)-float(texture2DRect(depthSampler,gl_MultiTexCoord0.xy-vec2(1.0,0.0)).r),\n\
-				                   float(texture2DRect(depthSampler,gl_MultiTexCoord0.xy+vec2(0.0,1.0)).r)-float(texture2DRect(depthSampler,gl_MultiTexCoord0.xy-vec2(0.0,1.0)).r),\n\
-				                   -2.0);\n\
-				\n\
-				/* Calculate the pixel's normal plane in depth image space: */\n\
-				vec4 diPlane=vec4(diNormal,-dot(diPixel.xyz,diNormal));\n\
-				\n\
-				/* Project the pixel to eye space: */\n\
-				vec4 eyePixel=depthProjection*diPixel;\n\
-				\n\
-				/* Transform the normal plane to eye space: */\n\
-				vec3 eyeNormal=normalize((inverseTransposedDepthProjection*diPlane).xyz);\n\
-				\n\
-				/* Initialize the color accumulators: */\n\
-				vec4 ambientDiffuseAccumulator=gl_LightModel.ambient*gl_FrontMaterial.ambient;\n\
-				vec4 specularAccumulator=vec4(0.0,0.0,0.0,0.0);\n\
-				\n\
-				/* Call light accumulation functions for all enabled light sources: */\n";
+		\n\
+		/* Calculate the pixel's normal vector in depth image space, ignoring per-pixel depth correction: */\n\
+		vec3 diNormal=vec3(float(texture2DRect(depthSampler,gl_MultiTexCoord0.xy+vec2(1.0,0.0)).r)-float(texture2DRect(depthSampler,gl_MultiTexCoord0.xy-vec2(1.0,0.0)).r),\n\
+		                   float(texture2DRect(depthSampler,gl_MultiTexCoord0.xy+vec2(0.0,1.0)).r)-float(texture2DRect(depthSampler,gl_MultiTexCoord0.xy-vec2(0.0,1.0)).r),\n\
+		                   -2.0);\n\
+		\n\
+		/* Calculate the pixel's normal plane in depth image space: */\n\
+		vec4 diPlane=vec4(diNormal,-dot(diPixel.xyz,diNormal));\n\
+		\n\
+		/* Project the pixel to eye space: */\n\
+		vec4 eyePixel=depthProjection*diPixel;\n\
+		\n\
+		/* Transform the normal plane to eye space: */\n\
+		vec3 eyeNormal=normalize((inverseTransposedDepthProjection*diPlane).xyz);\n\
+		\n\
+		/* Initialize the color accumulators: */\n\
+		vec4 ambientDiffuseAccumulator=gl_LightModel.ambient*gl_FrontMaterial.ambient;\n\
+		vec4 specularAccumulator=vec4(0.0,0.0,0.0,0.0);\n\
+		\n\
+		/* Call light accumulation functions for all enabled light sources: */\n";
 		
 		/* Call the appropriate light accumulation function for every enabled light source: */
 		for(int lightIndex=0;lightIndex<lightTracker->getMaxNumLights();++lightIndex)
@@ -323,7 +324,7 @@ void Projector2::buildRenderingShader(GLShaderManager::Namespace& shaderNamespac
 				
 				/* Call the light accumulation function from the vertex shader's main function: */
 				vertexShaderMain+="\
-						accumulateLight";
+		accumulateLight";
 				char liBuffer[12];
 				vertexShaderMain.append(Misc::print(lightIndex,liBuffer+11));
 				vertexShaderMain+="(eyePixel,eyeNormal,gl_FrontMaterial.ambient,gl_FrontMaterial.diffuse,gl_FrontMaterial.specular,gl_FrontMaterial.shininess,ambientDiffuseAccumulator,specularAccumulator);\n";
@@ -331,39 +332,39 @@ void Projector2::buildRenderingShader(GLShaderManager::Namespace& shaderNamespac
 		
 		/* Finish vertex shader's main function: */
 		vertexShaderMain+="\
-				\n\
-				/* Assign the final accumulated vertex color: */\n\
-				frontColor=ambientDiffuseAccumulator+specularAccumulator;\n\
-				\n\
-				/* Project the pixel from eye space to clip space: */\n\
-				gl_Position=gl_ProjectionMatrix*eyePixel;\n\
-				}\n";
+		\n\
+		/* Assign the final accumulated vertex color: */\n\
+		frontColor=ambientDiffuseAccumulator+specularAccumulator;\n\
+		\n\
+		/* Project the pixel from eye space to clip space: */\n\
+		gl_Position=gl_ProjectionMatrix*eyePixel;\n\
+		}\n";
 		}
 	else
 		{
 		/* Add to vertex shader's declarations: */
 		vertexShaderDeclarations+="\
-			uniform mat4 depthProjection; // Projection from depth image space to clip space, bypassing eye space\n";
+	uniform mat4 depthProjection; // Projection from depth image space to clip space, bypassing eye space\n";
 		
 		if(!mapTexture)
 			{
 			/* Add to vertex shader's declarations: */
 			vertexShaderDeclarations+="\
-				varying vec4 frontColor;\n";
+	varying vec4 frontColor;\n";
 			
 			/* Add to vertex shader's main function: */
 			vertexShaderMain+="\
-					\n\
-					/* Assign uniform fragment color: */\n\
-					frontColor=gl_Color;\n";
+		\n\
+		/* Assign uniform fragment color: */\n\
+		frontColor=gl_Color;\n";
 			}
 		
 		/* Finish vertex shader's main function: */
 		vertexShaderMain+="\
-				\n\
-				/* Project the pixel from depth image space to clip space: */\n\
-				gl_Position=depthProjection*diPixel;\n\
-				}\n";
+		\n\
+		/* Project the pixel from depth image space to clip space: */\n\
+		gl_Position=depthProjection*diPixel;\n\
+		}\n";
 		}
 	
 	/* Compile the vertex shader: */
@@ -371,66 +372,85 @@ void Projector2::buildRenderingShader(GLShaderManager::Namespace& shaderNamespac
 	
 	/* Start fragment shader's main function: */
 	std::string fragmentShaderMain="\
-		void main()\n\
-			{\n";
+	void main()\n\
+		{\n";
 	
 	std::string fragmentShaderDeclarations;
 	if(mapTexture)
 		{
 		/* Add to fragment shader's declarations: */
 		fragmentShaderDeclarations+="\
-			uniform sampler2D colorSampler; // Sampler for color image texture\n";
+	uniform sampler2D colorSampler; // Sampler for color image texture\n";
 		
 		if(colorSpace==FrameSource::RGB)
 			{
 			/* Add to fragment shader's main function: */
 			fragmentShaderMain+="\
-					vec4 texColor=texture2DProj(colorSampler,gl_TexCoord[0]);\n";
+		vec4 texColor=texture2DProj(colorSampler,gl_TexCoord[0]);\n";
 			}
 		else
 			{
 			/* Add to fragment shader's main function: */
 			fragmentShaderMain+="\
-					vec4 ypcbcrColor=texture2DProj(colorSampler,gl_TexCoord[0]);\n\
-					\n\
-					/* Convert the color to RGB directly: */ \n\
-					float grey=(ypcbcrColor[0]-16.0/255.0)*1.16438; \n\
-					vec4 texColor; \n\
-					texColor[0]=grey+(ypcbcrColor[2]-128.0/255.0)*1.59603; \n\
-					texColor[1]=grey-(ypcbcrColor[1]-128.0/255.0)*0.391761-(ypcbcrColor[2]-128.0/255.0)*0.81297; \n\
-					texColor[2]=grey+(ypcbcrColor[1]-128.0/255.0)*2.01723; \n\
-					texColor[3]=ypcbcrColor[3];\n";
+		vec4 ypcbcrColor=texture2DProj(colorSampler,gl_TexCoord[0]);\n\
+		\n\
+		/* Convert the texture color to RGB: */\n\
+		float y=ypcbcrColor.r;\n\
+		vec4 texColor;\n\
+		texColor.r=y+1.402*(ypcbcrColor.b-0.5);\n\
+		texColor.g=y-0.344136286*(ypcbcrColor.g-0.5)-0.714136286*(ypcbcrColor.b-0.5);\n\
+		texColor.b=y+1.772*(ypcbcrColor.g-0.5);\n\
+		texColor.a=ypcbcrColor.a;\n";
+			
+			#if 0
+		float y=(ypcbcrColor.r-16.0/255.0)*1.16438;\n\
+		vec4 texColor;\n\
+		texColor.r=y+(ypcbcrColor.b-128.0/255.0)*1.59603;\n\
+		texColor.g=y-(ypcbcrColor.g-128.0/255.0)*0.391761-(ypcbcrColor.b-128.0/255.0)*0.81297;\n\
+		texColor.b=y+(ypcbcrColor.g-128.0/255.0)*2.01723;\n\
+		texColor.a=ypcbcrColor.a;\n;
+			#endif
+			
+			if(correctGamma)
+				{
+			fragmentShaderMain+="\
+		\n\
+		/* Gamma-correct the RGB value: */\n\
+		texColor.r=texColor.r<=0.04845?texColor.r/12.92:pow((texColor.r+0.055)/1.055,2.4);\n\
+		texColor.g=texColor.g<=0.04845?texColor.g/12.92:pow((texColor.g+0.055)/1.055,2.4);\n\
+		texColor.b=texColor.b<=0.04845?texColor.b/12.92:pow((texColor.b+0.055)/1.055,2.4);\n";
+				}
 			}
 		
 		if(illuminate)
 			{
 			/* Add to fragment shader's declarations: */
 			fragmentShaderDeclarations+="\
-				varying vec4 frontColor;\n";
+	varying vec4 frontColor;\n";
 			
 			/* Finish fragment shader's main function: */
 			fragmentShaderMain+="\
-					gl_FragColor=texColor*frontColor;\n\
-					}\n";
+		gl_FragColor=texColor*frontColor;\n\
+		}\n";
 			}
 		else
 			{
 			/* Finish fragment shader's main function: */
 			fragmentShaderMain+="\
-					gl_FragColor=texColor;\n\
-					}\n";
+		gl_FragColor=texColor;\n\
+		}\n";
 			}
 		}
 	else
 		{
 		/* Add to fragment shader's declarations: */
 		fragmentShaderDeclarations+="\
-			varying vec4 frontColor;\n";
+	varying vec4 frontColor;\n";
 		
 		/* Finish fragment shader's main function: */
 		fragmentShaderMain+="\
-				gl_FragColor=frontColor;\n\
-				}\n";
+		gl_FragColor=frontColor;\n\
+		}\n";
 		}
 	
 	/* Compile the fragment shader: */
@@ -1176,7 +1196,7 @@ void Projector2::glRenderAction(GLContextData& contextData) const
 	if(sns.getShader(shaderIndex)==GLhandleARB(0)||sns.isOutdated(shaderIndex,ltVersion))
 		{
 		/* (Re-)build the facade rendering shader: */
-		buildRenderingShader(sns,shaderIndex,lightTracker);
+		buildRenderingShader(sns,shaderIndex,lightTracker,contextData.getContext().isNonlinear());
 		sns.markUpToDate(shaderIndex,ltVersion);
 		}
 	

@@ -351,6 +351,16 @@ FrameSource::IntrinsicParameters::Point2 FrameSource::IntrinsicParameters::undis
 	return ct2i.transform(utp);
 	}
 
+FrameSource::IntrinsicParameters::Scalar FrameSource::IntrinsicParameters::depthToZ(unsigned int rawDepth) const
+	{
+	/* Create a 3D point in depth image space: */
+	Point2 dip2=dt2i.transform(Point2::origin);
+	PTransform::Point dip(dip2[0],dip2[1],rawDepth);
+	
+	/* Unproject the point and return its z value: */
+	return depthProjection.transform(dip)[2];
+	}
+
 /****************************
 Methods of class FrameSource:
 ****************************/

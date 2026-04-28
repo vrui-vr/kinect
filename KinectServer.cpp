@@ -89,7 +89,7 @@ void KinectServer::CameraState::depthStreamingCallback(const Kinect::FrameBuffer
 	}
 
 KinectServer::CameraState::CameraState(const char* serialNumber,bool sLossyDepthCompression)
-	:camera(Kinect::openDirectFrameSource(serialNumber,false)),cameraIndex(0U),
+	:camera(Kinect::openDirectFrameSource(serialNumber)),cameraIndex(0U),
 	 depthCorrection(0),framePipeFd(-1),
 	 colorFile(16384),colorCompressor(0),
 	 colorFrameIndex(0),hasSentColorFrame(false),

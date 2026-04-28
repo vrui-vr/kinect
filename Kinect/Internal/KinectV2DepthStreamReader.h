@@ -113,6 +113,18 @@ class KinectV2DepthStreamReader
 	/* Methods: */
 	void loadP0Tables(IO::FilePtr file); // Reads per-pixel and per-exposure phase offset tables from file
 	void calcXZTables(const KinectV2CommandDispatcher::DepthCameraParams& depthCameraParams); // Calculates the X and Z depth calculation tables based on depth camera parameters
+	float getZMin(void) const // Returns the minimum absolute z value for depth quantization
+		{
+		return zMin;
+		}
+	float getZMax(void) const // Returns the maximum absolute z value for depth quantization
+		{
+		return zMax;
+		}
+	unsigned int getDMax(void) const // Returns the current maximum integer depth value contained in returned depth images
+		{
+		return dMax;
+		}
 	void setDMax(unsigned int newDMax); // Sets the maximum integer depth value contained in returned depth images; current Kinect package expects 2047; maximum is 65535
 	void setZRange(float newZMin,float newZMax); // Sets the range of linear z values for quantization
 	float getA(void) const // Returns the first z-to-depth conversion formula coefficient

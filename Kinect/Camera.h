@@ -125,6 +125,8 @@ class Camera:public DirectFrameSource
 	
 	/* Elements: */
 	private:
+	static const Size actualFrameSizes[2]; // Actual frame sizes in pixels for the two selectable resolutions
+	static const Rational actualFrameRates[2]; // Actual frame rates in Hz for the two selectable frame rates
 	USB::Device device; // The USB device representing this Kinect camera
 	std::string serialNumber; // This Kinect camera's serial number
 	size_t calibrationParameterReplySizes[4]; // USB reply sizes when querying the four subsets of factory calibration parameters
@@ -169,6 +171,8 @@ class Camera:public DirectFrameSource
 	virtual ~Camera(void); // Destroys the camera
 	
 	/* Methods from class FrameSource: */
+	virtual ColorStreamFormat getColorStreamFormat(void) const;
+	virtual DepthStreamFormat getDepthStreamFormat(void) const;
 	virtual DepthCorrection* getDepthCorrectionParameters(void);
 	virtual IntrinsicParameters getIntrinsicParameters(void);
 	virtual const Size& getActualFrameSize(int sensor) const;
@@ -178,6 +182,9 @@ class Camera:public DirectFrameSource
 	
 	/* Methods from class DirectFrameSource: */
 	virtual std::string getSerialNumber(void);
+	virtual void requestColorStreamFormat(const ColorStreamFormat& format);
+	virtual void requestDepthStreamFormat(const DepthStreamFormat& format);
+	virtual void requestZRange(const ZRange& zRange);
 	virtual void configure(Misc::ConfigurationFileSection& configFileSection);
 	virtual void buildSettingsDialog(GLMotif::RowColumn* settingsDialog);
 	

@@ -51,39 +51,48 @@ Methods of class CameraRealSense:
 
 void CameraRealSense::initialize(void)
 	{
+	/* Never called... */
 	}
 
 void CameraRealSense::setColorStreamState(bool enable)
 	{
+	/* Never called... */
 	}
 
 void CameraRealSense::setDepthStreamState(bool enable)
 	{
+	/* Never called... */
 	}
 
 void* CameraRealSense::streamingThreadMethod(void)
 	{
+	/* Never called... */
 	return 0;
 	}
 
 void CameraRealSense::irEmitterEnabledToggleCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData)
 	{
+	/* Never called... */
 	}
 
 void CameraRealSense::irGainSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
 	{
+	/* Never called... */
 	}
 
 void CameraRealSense::irExposureAutoToggleCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData)
 	{
+	/* Never called... */
 	}
 
 void CameraRealSense::irExposureSliderCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
 	{
+	/* Never called... */
 	}
 
 void CameraRealSense::qualityMenuValueChangedCallback(GLMotif::DropdownBox::ValueChangedCallbackData* cbData)
 	{
+	/* Never called... */
 	}
 
 size_t CameraRealSense::getNumDevices(void)
@@ -104,56 +113,78 @@ CameraRealSense::CameraRealSense(const char* serialNumber)
 
 CameraRealSense::~CameraRealSense(void)
 	{
+	/* Never called... */
+	}
+
+FrameSource::ColorStreamFormat CameraRealSense::getColorStreamFormat(void) const
+	{
+	/* Never called... */
+	return ColorStreamFormat();
+	}
+
+FrameSource::DepthStreamFormat CameraRealSense::getDepthStreamFormat(void) const
+	{
+	/* Never called... */
+	return DepthStreamFormat();
 	}
 
 FrameSource::DepthCorrection* CameraRealSense::getDepthCorrectionParameters(void)
 	{
+	/* Never called... */
 	return 0;
 	}
 
 FrameSource::IntrinsicParameters CameraRealSense::getIntrinsicParameters(void)
 	{
+	/* Never called... */
 	return IntrinsicParameters();
 	}
 
 const Size& CameraRealSense::getActualFrameSize(int sensor) const
 	{
+	/* Never called... */
 	return frameSizes[sensor];
 	}
 
 void CameraRealSense::startStreaming(void)
 	{
+	/* Never called... */
 	}
 
 void CameraRealSense::stopStreaming(void)
 	{
+	/* Never called... */
 	}
 
 std::string CameraRealSense::getSerialNumber(void)
 	{
+	/* Never called... */
 	return std::string();
+	}
+
+void CameraRealSense::requestColorStreamFormat(const FrameSource::ColorStreamFormat& format)
+	{
+	/* Never called... */
+	}
+
+void CameraRealSense::requestDepthStreamFormat(const FrameSource::DepthStreamFormat& format)
+	{
+	/* Never called... */
+	}
+
+void CameraRealSense::requestZRange(const DirectFrameSource::ZRange& zRange)
+	{
+	/* Never called... */
 	}
 
 void CameraRealSense::configure(Misc::ConfigurationFileSection& configFileSection)
 	{
-	DirectFrameSource::configure(configFileSection);
+	/* Never called... */
 	}
 
 void CameraRealSense::buildSettingsDialog(GLMotif::RowColumn* settingsDialog)
 	{
-	DirectFrameSource::buildSettingsDialog(settingsDialog);
-	}
-
-void CameraRealSense::setFrameSize(int camera,const Size& newFrameSize)
-	{
-	}
-
-void CameraRealSense::setFrameRate(int camera,int newFrameRate)
-	{
-	}
-
-void CameraRealSense::setZRange(RSDepthPixel zMin,RSDepthPixel zMax)
-	{
+	/* Never called... */
 	}
 
 }

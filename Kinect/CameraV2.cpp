@@ -66,12 +66,12 @@ void CameraV2::initialize(void)
 	/* Calculate the depth calculation parameter tables: */
 	depthStreamReader->calcXZTables(commandDispatcher->getDepthCameraParams());
 	
-	/* Initialize frame sizes: */
-	frameSizes[0]=Size(1920,1080);
-	frameSizes[1]=Size(512,424);
-	
-	/* Select a Y'CbCr color space: */
+	/* Select a Y'CbCr color space to save some time in MJPEG decoding: */
 	colorSpace=YPCBCR;
+	
+	/* Initialize the frame sizes: */
+	frameSizes[COLOR]=Size(1920,1080);
+	frameSizes[DEPTH]=Size(512,424);
 	}
 
 namespace {
@@ -167,6 +167,28 @@ CameraV2::~CameraV2(void)
 	delete colorStreamReader;
 	delete depthStreamReader;
 	delete commandDispatcher;
+	}
+
+FrameSource::ColorStreamFormat CameraV2::getColorStreamFormat(void) const
+	{
+	/* Return the current stream format: */
+	ColorStreamFormat result;
+	result.frameSize=frameSizes[COLOR];
+	result.frameRate=Rational(30);
+	result.colorSpace=colorSpace;
+	
+	return result;
+	}
+
+FrameSource::DepthStreamFormat CameraV2::getDepthStreamFormat(void) const
+	{
+	/* Return the current stream format: */
+	DepthStreamFormat result;
+	result.frameSize=frameSizes[DEPTH];
+	result.frameRate=Rational(30);
+	result.depthRange=DepthRange(0,depthStreamReader->getDMax());
+	
+	return result;
 	}
 
 FrameSource::DepthCorrection* CameraV2::getDepthCorrectionParameters(void)
@@ -369,13 +391,27 @@ std::string CameraV2::getSerialNumber(void)
 	return serialNumber;
 	}
 
-void CameraV2::forceRgb(void)
+void CameraV2::requestColorStreamFormat(const FrameSource::ColorStreamFormat& format)
 	{
-	/* Set the JPEG stream reader to RGB mode: */
-	colorStreamReader->setForceRgb(true);
+	/* Ignore the requested frame size and frame rate... */
 	
-	/* Select an RGB color space: */
-	colorSpace=RGB;
+	/* Set the JPEG stream reader's color space: */
+	colorSpace=format.colorSpace;
+	colorStreamReader->setForceRgb(colorSpace==RGB);
+	}
+
+void CameraV2::requestDepthStreamFormat(const FrameSource::DepthStreamFormat& format)
+	{
+	/* Ignore the requested frame size and frame rate... */
+	
+	/* Set the depth stream reader's maximum depth value: */
+	depthStreamReader->setDMax(format.depthRange.getMax());
+	}
+
+void CameraV2::requestZRange(const DirectFrameSource::ZRange& zRange)
+	{
+	/* Set the depth stream reader's z value range: */
+	depthStreamReader->setZRange(zRange.getMin(),zRange.getMax());
 	}
 
 }

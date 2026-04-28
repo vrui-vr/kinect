@@ -950,8 +950,13 @@ RawKinectViewer::RawKinectViewer(int& argc,char**& argv)
 		}
 	
 	/* Connect to the 3D camera of the given index: */
-	camera=Kinect::openDirectFrameSource(cameraIndex,true);
+	camera=Kinect::openDirectFrameSource(cameraIndex);
 	std::cout<<"RawKinectViewer: Connected to 3D camera with serial number "<<camera->getSerialNumber()<<std::endl;
+	
+	/* Request color images in RGB color space: */
+	Kinect::FrameSource::ColorStreamFormat csf=camera->getColorStreamFormat();
+	csf.colorSpace=Kinect::FrameSource::RGB;
+	camera->requestColorStreamFormat(csf);
 	
 	/* Check if it's a first-generation Kinect to apply type-specific settings: */
 	Kinect::Camera* kinectV1=dynamic_cast<Kinect::Camera*>(camera);

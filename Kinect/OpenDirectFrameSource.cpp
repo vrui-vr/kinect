@@ -38,7 +38,7 @@ namespace Kinect {
 Namespace-global functions:
 **************************/
 
-DirectFrameSource* openDirectFrameSource(unsigned int index,bool forceRgb)
+DirectFrameSource* openDirectFrameSource(unsigned int index)
 	{
 	/* Acquire a USB context to prevent it from being created/destroyed repeatedly: */
 	USB::ContextPtr usbContext=USB::Context::acquireContext();
@@ -60,10 +60,7 @@ DirectFrameSource* openDirectFrameSource(unsigned int index,bool forceRgb)
 	if(searchIndex<numKinectV2s)
 		{
 		/* Return the second-generation Kinect camera of the given index: */
-		CameraV2* result=new CameraV2(searchIndex);
-		if(forceRgb)
-			result->forceRgb();
-		return result;
+		return new CameraV2(searchIndex);
 		}
 	searchIndex-=numKinectV2s;
 	
@@ -89,7 +86,7 @@ DirectFrameSource* openDirectFrameSource(unsigned int index,bool forceRgb)
 	throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Fewer than %u 3D cameras connected to local host",index+1);
 	}
 
-DirectFrameSource* openDirectFrameSource(const char* serialNumber,bool forceRgb)
+DirectFrameSource* openDirectFrameSource(const char* serialNumber)
 	{
 	/* Determine the type of camera from the given serial number: */
 	const char* snPtr;
@@ -105,10 +102,7 @@ DirectFrameSource* openDirectFrameSource(const char* serialNumber,bool forceRgb)
 		if(snPtr-serialNumber==2&&strncasecmp(serialNumber,"V2",2)==0)
 			{
 			/* Look for a second-generation Kinect camera: */
-			CameraV2* result=new CameraV2(snPtr+1);
-			if(forceRgb)
-				result->forceRgb();
-			return result;
+			return new CameraV2(snPtr+1);
 			}
 		else if(snPtr-serialNumber==2&&strncasecmp(serialNumber,"RS",2)==0)
 			{

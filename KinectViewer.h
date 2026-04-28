@@ -77,6 +77,7 @@ class KinectViewer:public Vrui::Application
 		KinectViewer* application; // Pointer to the application object
 		Kinect::FrameSource* source; // Pointer to the 3D video frame source
 		Kinect::ProjectorType* projector; // Pointer to the projector of configured type
+		float zRange[2]; // The absolute z value range of the depth stream in centimeters
 		Kinect::FrameSource::ExtrinsicParameters savedExtrinsics; // Saved extrinsic parameters of projector
 		Threads::Spinlock frameSaverMutex; // Mutex protecting changes to the frame saver object
 		Kinect::FrameSaver* frameSaver; // Pointer to a frame saver writing received color and depth frames to a pair of files

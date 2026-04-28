@@ -68,6 +68,94 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 
 // #include "MD5MeshAnimator.h"
 
+namespace {
+
+/**************
+Helper classes:
+**************/
+
+template <class ContentParam>
+class Maybe
+	{
+	/* Embedded classes: */
+	public:
+	typedef ContentParam Content; // Type of the data stored in this container
+	
+	/* Elements: */
+	private:
+	Content* content; // Pointer to the current content, or 0 if content is undefined
+	
+	/* Constructors and destructors: */
+	public:
+	Maybe(void) // Creates an empty container
+		:content(0)
+		{
+		}
+	Maybe(const Content& sContent) // Creates a container with the given content
+		:content(new Content(sContent))
+		{
+		}
+	Maybe(const Maybe& source) // Copy constructor
+		:content(source.content!=0?new Content(source.content):0)
+		{
+		}
+	~Maybe(void) // Destroys the container and its content
+		{
+		delete content;
+		}
+	
+	/* Methods: */
+	bool isValid(void) const // Returns true if the container has valid content
+		{
+		return content!=0;
+		}
+	operator const Content&(void) const // Conversion to content type; throws exception if the content is not valid
+		{
+		if(content==0)
+			throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Invalid content");
+		
+		return *content;
+		}
+	operator Content&(void) // Ditto
+		{
+		if(content==0)
+			throw Misc::makeStdErr(__PRETTY_FUNCTION__,"Invalid content");
+		
+		return *content;
+		}
+	Maybe& operator=(const Content& newContent) // Assignment operator
+		{
+		/* Replace the current content: */
+		delete content;
+		content=new Content(newContent);
+		
+		return *this;
+		}
+	Maybe& operator=(const Maybe& source) // Copy assignment operator
+		{
+		if(this!=&source)
+			{
+			/* Replace the current content: */
+			delete[] content;
+			content=0;
+			if(source.content!=0)
+				content=new Content(source.content);
+			}
+		
+		return *this;
+		}
+	Maybe& clear(void) // Invalidates the current content
+		{
+		/* Drop the current content: */
+		delete content;
+		content=0;
+		
+		return *this;
+		}
+	};
+
+}
+
 /*********************************************
 Methods of class KinectViewer::KinectStreamer:
 *********************************************/
@@ -344,6 +432,15 @@ KinectViewer::KinectStreamer::KinectStreamer(KinectViewer* sApplication,Kinect::
 	 sphereExtractor(0),
 	 streamerDialog(0),showStreamerDialogToggle(0)
 	{
+	/* Calculate the depth stream's z value range: */
+	Kinect::FrameSource::DepthStreamFormat dsf=source->getDepthStreamFormat();
+	zRange[0]=float(-projector->getIntrinsicParameters().depthToZ(dsf.depthRange.getMin()));
+	zRange[1]=float(-projector->getIntrinsicParameters().depthToZ(dsf.depthRange.getMax()));
+	
+	/* Print the streamer's stream format: */
+	Kinect::FrameSource::ColorStreamFormat csf=source->getColorStreamFormat();
+	std::cout<<"  Color stream format: "<<csf.frameSize[0]<<'x'<<csf.frameSize[1]<<'&'<<double(csf.frameRate)<<"Hz, "<<(csf.colorSpace==Kinect::FrameSource::YPCBCR?"Y'CbCr":"RGB")<<std::endl;
+	std::cout<<"  Depth stream format: "<<dsf.frameSize[0]<<'x'<<dsf.frameSize[1]<<'&'<<double(dsf.frameRate)<<"Hz, Z=["<<zRange[0]<<", "<<zRange[1]<<']'<<std::endl;
 	}
 
 KinectViewer::KinectStreamer::~KinectStreamer(void)
@@ -617,9 +714,13 @@ KinectViewer::KinectViewer(int& argc,char**& argv)
 	{
 	/* Add a streamer for each camera index or frame file name prefix passed on the command line: */
 	bool printHelp=false;
-	bool highres=false;
+	Maybe<Kinect::Size> colorSize;
+	Maybe<Kinect::FrameSource::Rational> colorFrameRate;
+	Maybe<Kinect::Size> depthSize;
+	Maybe<Kinect::FrameSource::Rational> depthFrameRate;
+	Maybe<Kinect::DirectFrameSource::ZRange> zRange;
+	Maybe<int> triangleDepthRange;
 	bool compressDepth=false;
-	int triangleDepthRange=-1;
 	const char* saveFileName=0;
 	for(int i=1;i<argc;++i)
 		{
@@ -627,10 +728,48 @@ KinectViewer::KinectViewer(int& argc,char**& argv)
 			{
 			if(strcasecmp(argv[i]+1,"h")==0)
 				printHelp=true;
-			else if(strcasecmp(argv[i]+1,"high")==0)
-				highres=true;
-			else if(strcasecmp(argv[i]+1,"low")==0)
-				highres=false;
+			else if(strcasecmp(argv[i]+1,"cs")==0||strcasecmp(argv[i]+1,"ds")==0)
+				{
+				char sensor=argv[i][1];
+				Kinect::Size size;
+				for(int j=0;j<2;++j)
+					{
+					++i;
+					size[j]=(unsigned int)(atoi(argv[i]));
+					}
+				if(sensor=='c'||sensor=='C')
+					colorSize=size;
+				else
+					depthSize=size;
+				}
+			else if(strcasecmp(argv[i]+1,"cr")==0||strcasecmp(argv[i]+1,"dr")==0)
+				{
+				char sensor=argv[i][1];
+				Kinect::FrameSource::Rational rate;
+				++i;
+				char* endPtr;
+				int num=strtol(argv[i],&endPtr,10);
+				int denom=1;
+				if(*endPtr=='/')
+					denom=strtol(endPtr+1,&endPtr,10);
+				if(*endPtr=='\0')
+					{
+					if(sensor=='c'||sensor=='C')
+						colorFrameRate=Kinect::FrameSource::Rational(num,denom);
+					else
+						depthFrameRate=Kinect::FrameSource::Rational(num,denom);
+					}
+				}
+			else if(strcasecmp(argv[i]+1,"zr")==0)
+				{
+				float zs[2];
+				for(int j=0;j<2;++j)
+					{
+					++i;
+					zs[j]=float(atof(argv[i]));
+					}
+				zRange=Kinect::DirectFrameSource::ZRange(zs[0],zs[1]);
+				}
 			else if(strcasecmp(argv[i]+1,"compress")==0)
 				compressDepth=true;
 			else if(strcasecmp(argv[i]+1,"nocompress")==0)
@@ -654,19 +793,35 @@ KinectViewer::KinectViewer(int& argc,char**& argv)
 					{
 					/* Open the 3D camera of the given index: */
 					int cameraIndex=atoi(argv[i]);
-					Kinect::DirectFrameSource* camera=Kinect::openDirectFrameSource(cameraIndex,false);
+					Kinect::DirectFrameSource* camera=Kinect::openDirectFrameSource(cameraIndex);
 					std::cout<<"KinectViewer: Connected to 3D camera with serial number "<<camera->getSerialNumber()<<std::endl;
+					
+					/* Configure the 3D camera: */
+					Kinect::FrameSource::ColorStreamFormat csf=camera->getColorStreamFormat();
+					if(colorSize.isValid())
+						csf.frameSize=colorSize;
+					if(colorFrameRate.isValid())
+						csf.frameRate=colorFrameRate;
+					camera->requestColorStreamFormat(csf);
+					Kinect::FrameSource::DepthStreamFormat dsf=camera->getDepthStreamFormat();
+					if(depthSize.isValid())
+						dsf.frameSize=depthSize;
+					if(depthFrameRate.isValid())
+						dsf.frameRate=depthFrameRate;
+					camera->requestDepthStreamFormat(dsf);
+					if(zRange.isValid())
+						camera->requestZRange(zRange);
 					
 					/* Check if it's a first-generation Kinect to apply type-specific settings: */
 					Kinect::Camera* kinectV1=dynamic_cast<Kinect::Camera*>(camera);
 					if(kinectV1!=0)
 						{
-						/* Set the color camera's frame size: */
-						kinectV1->setFrameSize(Kinect::FrameSource::COLOR,highres?Kinect::Camera::FS_1280_1024:Kinect::Camera::FS_640_480);
-						
 						/* Set depth frame compression: */
 						kinectV1->setCompressDepthFrames(compressDepth);
 						}
+					
+					/* Apply the camera configuration: */
+					camera->fixFormats();
 					
 					/* Enable background removal if the camera has a default background image: */
 					if(camera->loadDefaultBackground())
@@ -674,7 +829,7 @@ KinectViewer::KinectViewer(int& argc,char**& argv)
 					
 					/* Add a new streamer for the camera: */
 					KinectStreamer* streamer=new KinectStreamer(this,camera);
-					if(triangleDepthRange>=0)
+					if(triangleDepthRange.isValid())
 						streamer->setTriangleDepthRange(triangleDepthRange);
 					streamers.push_back(streamer);
 					}
@@ -697,7 +852,7 @@ KinectViewer::KinectViewer(int& argc,char**& argv)
 				
 				/* Add a new streamer for the file source: */
 				KinectStreamer* streamer=new KinectStreamer(this,fileSource);
-				if(triangleDepthRange>=0)
+				if(triangleDepthRange.isValid())
 					streamer->setTriangleDepthRange(triangleDepthRange);
 				streamers.push_back(streamer);
 				}

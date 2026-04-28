@@ -53,7 +53,7 @@ class CameraV2:public DirectFrameSource
 	USB::TransferPool* colorTransfers;
 	KinectV2DepthStreamReader* depthStreamReader;
 	USB::TransferPool* depthTransfers;
-	Size frameSizes[2]; // Width and height of the color and depth frames, respectively
+	Size frameSizes[2]; // Frame sizes of the color and depth cameras, respectively
 	
 	/* Private methods: */
 	void initialize(void); // Initializes the Kinect v2 camera; called from constructors
@@ -67,6 +67,8 @@ class CameraV2:public DirectFrameSource
 	virtual ~CameraV2(void); // Destroys the camera
 	
 	/* Methods from class FrameSource: */
+	virtual ColorStreamFormat getColorStreamFormat(void) const;
+	virtual DepthStreamFormat getDepthStreamFormat(void) const;
 	virtual DepthCorrection* getDepthCorrectionParameters(void);
 	virtual IntrinsicParameters getIntrinsicParameters(void);
 	virtual const Size& getActualFrameSize(int sensor) const;
@@ -75,9 +77,9 @@ class CameraV2:public DirectFrameSource
 	
 	/* Methods from class DirectFrameSource: */
 	virtual std::string getSerialNumber(void);
-	
-	/* New methods: */
-	void forceRgb(void); // Forces the camera into RGB color mode
+	virtual void requestColorStreamFormat(const ColorStreamFormat& format);
+	virtual void requestDepthStreamFormat(const DepthStreamFormat& format);
+	virtual void requestZRange(const ZRange& zRange);
 	};
 
 }
