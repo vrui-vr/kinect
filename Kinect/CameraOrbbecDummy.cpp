@@ -151,6 +151,11 @@ void CameraOrbbec::configure(Misc::ConfigurationFileSection& configFileSection)
 	/* Never called */
 	}
 
+void CameraOrbbec::fixFormats(void)
+	{
+	/* Never called */
+	}
+
 void CameraOrbbec::buildSettingsDialog(GLMotif::RowColumn* settingsDialog)
 	{
 	/* Never called */
