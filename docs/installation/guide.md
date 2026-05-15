@@ -12,7 +12,7 @@ As stated on Kinect's [Getting Started](./index.md) page, you must have the Vrui
 ## Option 1: Installing with PullPackage (easy)
 
 ??? info "Heads up!"
-    If you haven't used DataLab's package manager, PullPackage, to install either Vrui or one of its applications before, installing PullPackage will allow you to follow simpler installation steps for all following applications, as you will see in the next step. <!-- "DataLab at UC Davis" ? unsure abt branding/monikers -->
+    If you haven't used DataLab's package manager, PullPackage, to install either Vrui or one of its applications before, installing PullPackage will allow you to follow simpler installation steps for all following applications, as you will see below. <!-- "DataLab at UC Davis" ? unsure abt branding/monikers -->
 
 --8<--
 pullpackage.md
@@ -33,7 +33,7 @@ The Kinect code repository can be downloaded either by:
 !!! warning
     If you are unfamiliar with git and/or GitHub, you should probably go the zip file route.
 
-=== "1. Downloading and unpacking a zip file from GitHub"
+=== "Option 1: Downloading and unpacking a zip file from GitHub"
 
     On [the Kinect repository's main page](https://github.com/vrui-vr/kinect), click on the green "<> Code" button, and then click on "Download ZIP" in the menu that pops up in response.
 
