@@ -1,83 +1,108 @@
 !!! tip
     It is recommended to download or move the source packages for Vrui and the Kinect 3D Video Capture Project into a `src` directory underneath the user's home directory. Otherwise, references to `~/src` in the following instructions need to be changed.
 
+<!-- todo add collab infrastructure to docs and link here -->
 <!-- ## Step 1: Install Vrui's collaboration infrastructure (optional)
 
-<!-- todo add collab infrastructure to docs and link here -->
 More info about the collaboration infrastructure and the installation guide can be found at [github.com/vrui-vr/collaboration/blob/main/README](https://github.com/vrui-vr/collaboration/blob/main/README). -->
 
-## Step 1: Unpack the Kinect 3D Video Capture
+As stated on Kinect's [Getting Started](./index.md) page, you must have the Vrui VR Toolkit installed first in order to follow these instructions to install Vrui's application, Kinect. Check out [these instructions](../../../vrui/installation) to install Vrui.
 
-### Option 1: Downloading and unpacking a zip file from GitHub
 
-On [the Kinect repository's main page](https://github.com/vrui-vr/kinect), click on the green "<> Code" button, and then click on "Download ZIP" in the menu that pops up in response.
+## Option 1: Installing with PullPackage (easy)
 
-![Downloading a ZIP from a GitHub repo](download_zip.png)
+??? info "Heads up!"
+    If you haven't used DataLab's package manager, PullPackage, to install either Vrui or one of its applications before, installing PullPackage will allow you to follow simpler installation steps for all following applications, as you will see below. <!-- "DataLab at UC Davis" ? unsure abt branding/monikers -->
 
-Depending on your browser settings, you may be asked where to store the file being downloaded, or it might be stored in a default location, such as your `Downloads` directory. Take note of what the zip file is called and where it is stored.
+--8<--
+pullpackage.md
+pullpackage_kinect.md
+--8<--
 
-Assuming that you already created the `src` directory *according to Vrui's installation instructions*, enter the following line into a terminal window once the file is completely downloaded:
+You're done!
 
-```sh
-cd ~/src
-```
+## Option 2: Manual install (advanced)
 
-Then enter into the same terminal window:
+### Step 1: Unpack the Kinect 3D Video Capture
 
-```sh
-unzip <path to downloaded zip file>
-```
+The Kinect code repository can be downloaded either by: 
 
-Replace `<path to downloaded zip file>` with the full path to the zip file, for example `~/Downloads/kinect-main.zip`.
-
-Finally, check for the name of your new Kinect directory by entering:
-
-```sh
-ls
-```
-
-which will list all files in the `src` directory, which should include a new directory called `kinect-main`. Take note of this name, and then enter into that directory by typing this command into the terminal window:
-
-```sh
-cd <Kinect directory>
-```
-
-where you replace `<Kinect directory>` with the name of the directory where you cloned/unpacked the Kinect in the previous step, as printed by `ls`.
-
-### Option 2: Clone the repository from GitHub
-
-Assuming that you already created the `src` directory *according to Vrui's installation instructions*, navigate to the `src` directory on your computer in the terminal window.
-
-```sh
-cd ~/src
-```
-
-Then, clone the repository from GitHub:
-
-```sh
-git clone https://github.com/vrui-vr/kinect.git
-```
-
-Finally, check for the name of your new Kinect directory by entering:
-
-```sh
-ls
-```
-
-which will list all files in the `src` directory, which should include a new directory called `kinect`. Take note of this name, and then enter into that directory by typing this command into the terminal window:
-
-```sh
-cd <Kinect directory>
-```
-
-where you replace `<Kinect directory>` with the name of the directory where you cloned/unpacked the Kinect in the previous step, as printed by `ls`.
+1. downloading the zip file and unpacking it **OR**
+2. cloning the repository with `git clone`
 
 !!! warning
-    If your installed Vrui version is not 13.0, or Vrui's installation directory was changed from the default of `/usr/local`, adapt the makefile using a text editor.
+    If you are unfamiliar with git and/or GitHub, you should probably go the zip file route.
 
-    Change the value of `VRUI_MAKEDIR` close to the beginning of the file as follows: `VRUI_MAKEDIR := <Vrui install dir>/share/make`, where <Vrui install dir> is the installation directory chosen when you installed Vrui. Use `$(HOME)` to refer to the user's home directory instead of `~`.
+=== "Option 1: Downloading and unpacking a zip file from GitHub"
 
-## Step 2: Build the Kinect 3D Video Capture Project
+    On [the Kinect repository's main page](https://github.com/vrui-vr/kinect), click on the green "<> Code" button, and then click on "Download ZIP" in the menu that pops up in response.
+
+    <!-- todo fix this: ![Downloading a ZIP from a GitHub repo](download_zip.png) -->
+
+    Depending on your browser settings, you may be asked where to store the file being downloaded, or it might be stored in a default location, such as your `Downloads` directory. Take note of what the zip file is called and where it is stored.
+
+    Assuming that you already created the `src` directory *according to Vrui's installation instructions*, enter the following line into a terminal window once the file is completely downloaded:
+
+    ```sh
+    cd ~/src
+    ```
+
+    Then enter into the same terminal window:
+
+    ```sh
+    unzip <path to downloaded zip file>
+    ```
+
+    Replace `<path to downloaded zip file>` with the full path to the zip file, for example `~/Downloads/kinect-main.zip`.
+
+    Finally, check for the name of your new Kinect directory by entering:
+
+    ```sh
+    ls
+    ```
+
+    which will list all files in the `src` directory, which should include a new directory called `kinect-main`. Take note of this name, and then enter into that directory by typing this command into the terminal window:
+
+    ```sh
+    cd <Kinect directory>
+    ```
+
+    where you replace `<Kinect directory>` with the name of the directory where you cloned/unpacked the Kinect in the previous step, as printed by `ls`.
+
+=== "Option 2: Clone the repository from GitHub"
+
+    Assuming that you already created the `src` directory *according to Vrui's installation instructions*, navigate to the `src` directory on your computer in the terminal window.
+
+    ```sh
+    cd ~/src
+    ```
+
+    Then, clone the repository from GitHub:
+
+    ```sh
+    git clone https://github.com/vrui-vr/kinect.git
+    ```
+
+    Finally, check for the name of your new Kinect directory by entering:
+
+    ```sh
+    ls
+    ```
+
+    which will list all files in the `src` directory, which should include a new directory called `kinect`. Take note of this name, and then enter into that directory by typing this command into the terminal window:
+
+    ```sh
+    cd <Kinect directory>
+    ```
+
+    where you replace `<Kinect directory>` with the name of the directory where you cloned/unpacked the Kinect in the previous step, as printed by `ls`.
+
+    !!! warning
+        If your installed Vrui version is not 13.0, or Vrui's installation directory was changed from the default of `/usr/local`, adapt the makefile using a text editor.
+
+        Change the value of `VRUI_MAKEDIR` close to the beginning of the file as follows: `VRUI_MAKEDIR := <Vrui install dir>/share/make`, where <Vrui install dir> is the installation directory chosen when you installed Vrui. Use `$(HOME)` to refer to the user's home directory instead of `~`.
+
+### Step 2: Build the Kinect 3D Video Capture Project
 
 Run the following from inside the `<Kinect directory>`:
 
@@ -93,7 +118,7 @@ If everything went well the first time, the second run will print:
 make: Nothing to be done for 'all'.
 ```
 
-## Step 3: Install the Kinect 3D Video Capture Project
+### Step 3: Install the Kinect 3D Video Capture Project
 
 If Vrui was installed in `/usr/local` or elsewhere outside the user's home directory:
 
@@ -109,7 +134,7 @@ If Vrui was installed inside the user's home directory:
 make install
 ```
 
-## Step 4: Install a udev rule file to give access to all users (optional, Linux-only)
+### Step 4: Install a udev rule file to give access to all users (optional, Linux-only)
 
 By default, Kinect devices can only be accessed by the root user. This is inconvenient and a security risk, as all Kinect applications must be run as root.
 
