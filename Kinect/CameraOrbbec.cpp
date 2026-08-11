@@ -281,6 +281,10 @@ void CameraOrbbec::depthFrameCallback(std::shared_ptr<ob::Frame> frame)
 			*dPtr=*sPtr>=min&&*sPtr<=max?FrameSource::DepthPixel(b-a/float(*sPtr)+0.5f):FrameSource::invalidDepth;
 		}
 	
+	/* Morphologically erode the depth frame to get rid of edge sampling artifacts: */
+	for(int i=0;i<2;++i)
+		erodeDepthFrame(depthFrame);
+	
 	/* Handle background capture and removal: */
 	processDepthFrameBackground(depthFrame);
 	
@@ -454,7 +458,7 @@ FrameSource::IntrinsicParameters CameraOrbbec::getIntrinsicParameters(void)
 		}
 	
 	/* Empirical correction for sub-optimal calibration on my camera, OB-CL8K14100BB: */
-	depthToColor*=IntrinsicParameters::PTransform::rotate(IntrinsicParameters::PTransform::Rotation::rotateZ(0.01));
+	// depthToColor*=IntrinsicParameters::PTransform::rotate(IntrinsicParameters::PTransform::Rotation::rotateZ(0.01));
 	
 	result.colorProjection*=depthToColor;
 	

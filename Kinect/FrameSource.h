@@ -214,6 +214,9 @@ class FrameSource
 	StreamingCallbackPtr colorStreamingCallback,depthStreamingCallback; // Callbacks called when a new color or depth frame is available, respectively
 	bool streaming; // Flag whether the frame source is currently streaming color and/or depth frames
 	
+	/* Protected methods: */
+	static void erodeDepthFrame(FrameBuffer& depthFrame); // Applies morphological erosion operator to a depth frame
+	
 	/* Constructors and destructors: */
 	public:
 	FrameSource(void);

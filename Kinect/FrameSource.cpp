@@ -365,6 +365,66 @@ FrameSource::IntrinsicParameters::Scalar FrameSource::IntrinsicParameters::depth
 Methods of class FrameSource:
 ****************************/
 
+void FrameSource::erodeDepthFrame(FrameBuffer& depthFrame)
+	{
+	/* Access the depth frame: */
+	unsigned int width=depthFrame.getSize(0);
+	unsigned int height=depthFrame.getSize(1);
+	DepthPixel* dfBegin=depthFrame.getData<DepthPixel>();
+	
+	/* Erode the depth frame in the y direction: */
+	for(unsigned int x=0;x<width;++x)
+		{
+		DepthPixel* dfPtr=dfBegin+x;
+		
+		/* Invalidate the first pixel if its upper neighbor is invalid, but remember its original state: */
+		bool lastInvalid=dfPtr[0]==invalidDepth;
+		if(dfPtr[width]==invalidDepth)
+			dfPtr[0]=invalidDepth;
+		dfPtr+=width;
+		
+		for(unsigned int y=1;y<height-1;++y,dfPtr+=width)
+			{
+			/* Invalidate the current pixel if its lower or upper neighbor are invalid, but remember its original state: */
+			bool currentInvalid=dfPtr[0]==invalidDepth;
+			if(lastInvalid||dfPtr[width]==invalidDepth)
+				dfPtr[0]=invalidDepth;
+			
+			lastInvalid=currentInvalid;
+			}
+		
+		/* Invalidate the last pixel if its lower neighbor is invalid: */
+		if(lastInvalid)
+			dfPtr[0]=invalidDepth;
+		}
+	
+	/* Erode the depth frame in the x direction: */
+	for(unsigned int y=0;y<height;++y)
+		{
+		DepthPixel* dfPtr=dfBegin+y*width;
+		
+		/* Invalidate the first pixel if its right neighbor is invalid, but remember its original state: */
+		bool lastInvalid=dfPtr[0]==invalidDepth;
+		if(dfPtr[1]==invalidDepth)
+			dfPtr[0]=invalidDepth;
+		dfPtr+=1;
+		
+		for(unsigned int x=1;x<width-1;++x,dfPtr+=1)
+			{
+			/* Invalidate the current pixel if its left or right neighbor are invalid, but remember its original state: */
+			bool currentInvalid=dfPtr[0]==invalidDepth;
+			if(lastInvalid||dfPtr[1]==invalidDepth)
+				dfPtr[0]=invalidDepth;
+			
+			lastInvalid=currentInvalid;
+			}
+		
+		/* Invalidate the last pixel if its left neighbor is invalid: */
+		if(lastInvalid)
+			dfPtr[0]=invalidDepth;
+		}
+	}
+
 FrameSource::FrameSource(void)
 	:colorSpace(RGB),streaming(false)
 	{

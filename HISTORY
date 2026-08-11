@@ -418,3 +418,6 @@ Kinect-6.0:
   cameras to Kinect::FrameSource.
 - Added ability to request streaming formats for the color and depth
   cameras to Kinect::DirectFrameSource.
+- Added Kinect::FrameSource::erodeDepthFrame method to remove artifacted
+  fringes from depth images captured by TOF cameras.
+  - Call method from Kinect::CameraOrbbec's depth frame callback.
