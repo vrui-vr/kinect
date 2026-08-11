@@ -421,3 +421,4 @@ Kinect-6.0:
 - Added Kinect::FrameSource::erodeDepthFrame method to remove artifacted
   fringes from depth images captured by TOF cameras.
   - Call method from Kinect::CameraOrbbec's depth frame callback.
+- Added missing include file to BackgroundViewer application.

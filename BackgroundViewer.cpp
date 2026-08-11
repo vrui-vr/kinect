@@ -1,7 +1,7 @@
 /***********************************************************************
 BackgroundViewer - Utility to view (and edit) a 3D camera's background
 removal frame.
-Copyright (c) 2018-2025 Oliver Kreylos
+Copyright (c) 2018-2026 Oliver Kreylos
 
 This file is part of the Kinect 3D Video Capture Project (Kinect).
 
@@ -32,6 +32,7 @@ Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 #include <IO/SeekableFile.h>
 #include <IO/OpenFile.h>
 #include <Math/Math.h>
+#include <Geometry/OrthogonalTransformation.h>
 #include <Geometry/ProjectiveTransformation.h>
 #include <GL/gl.h>
 #include <GL/GLModels.h>
